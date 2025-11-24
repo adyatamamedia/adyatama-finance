@@ -1,0 +1,253 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id               BigInt            @id @default(autoincrement())
+  username         String            @unique @db.VarChar(100)
+  password         String            @db.VarChar(255)
+  name             String?           @db.VarChar(150)
+  role             UserRole          @default(USER)
+  isActive         Boolean           @default(true) @map("is_active")
+  createdAt        DateTime          @default(now()) @map("created_at")
+  updatedAt        DateTime?         @updatedAt @map("updated_at")
+  categories       Category[]
+  invoicePayments  InvoicePayment[]
+  createdTemplates InvoiceTemplate[] @relation("TemplateCreator")
+  invoices         Invoice[]
+  settings         Setting[]
+  transactions     Transaction[]
+
+  @@map("users")
+}
+
+model Setting {
+  id        BigInt    @id @default(autoincrement())
+  key       String    @unique @db.VarChar(100)
+  value     String?   @db.Text
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime? @updatedAt @map("updated_at")
+  userId    BigInt?   @map("user_id")
+  user      User?     @relation(fields: [userId], references: [id])
+
+  @@index([userId], map: "settings_user_id_fkey")
+  @@map("settings")
+}
+
+model Category {
+  id           BigInt          @id @default(autoincrement())
+  userId       BigInt?         @map("user_id")
+  name         String          @db.VarChar(120)
+  type         TransactionType
+  createdAt    DateTime        @default(now()) @map("created_at")
+  updatedAt    DateTime?       @updatedAt @map("updated_at")
+  user         User?           @relation(fields: [userId], references: [id])
+  transactions Transaction[]
+
+  @@unique([userId, name, type])
+  @@map("categories")
+}
+
+model Customer {
+  id        BigInt    @id @default(autoincrement())
+  name      String    @db.VarChar(200)
+  email     String?   @db.VarChar(150)
+  phone     String?   @db.VarChar(50)
+  address   String?   @db.Text
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime? @updatedAt @map("updated_at")
+  invoices  Invoice[]
+
+  @@map("customers")
+}
+
+model Invoice {
+  id            BigInt           @id @default(autoincrement())
+  invoiceNo     String           @unique @map("invoice_no") @db.VarChar(50)
+  customerId    BigInt?          @map("customer_id")
+  userId        BigInt?          @map("user_id")
+  status        InvoiceStatus    @default(DRAFT)
+  issueDate     DateTime?        @map("issue_date") @db.Date
+  dueDate       DateTime?        @map("due_date") @db.Date
+  subtotal      Decimal          @default(0.00) @db.Decimal(15, 2)
+  discount      Decimal          @default(0.00) @db.Decimal(15, 2)
+  tax           Decimal          @default(0.00) @db.Decimal(15, 2)
+  total         Decimal          @default(0.00) @db.Decimal(15, 2)
+  currency      String           @default("IDR") @db.Char(3)
+  notes         String?          @db.Text
+  createdAt     DateTime         @default(now()) @map("created_at")
+  updatedAt     DateTime?        @updatedAt @map("updated_at")
+  templateId    BigInt?          @map("template_id")
+  items         InvoiceItem[]
+  payments      InvoicePayment[]
+  customer      Customer?        @relation(fields: [customerId], references: [id])
+  template      InvoiceTemplate? @relation(fields: [templateId], references: [id])
+  user          User?            @relation(fields: [userId], references: [id])
+  templateUsage TemplateUsage[]
+  transactions  Transaction[]
+
+  @@index([status])
+  @@index([issueDate])
+  @@index([customerId], map: "invoices_customer_id_fkey")
+  @@index([templateId], map: "invoices_template_id_fkey")
+  @@index([userId], map: "invoices_user_id_fkey")
+  @@map("invoices")
+}
+
+model InvoiceItem {
+  id          BigInt   @id @default(autoincrement())
+  invoiceId   BigInt   @map("invoice_id")
+  description String   @db.VarChar(500)
+  productSku  String?  @map("product_sku") @db.VarChar(100)
+  quantity    Decimal  @default(1.000) @db.Decimal(12, 3)
+  unitPrice   Decimal  @default(0.00) @map("unit_price") @db.Decimal(15, 2)
+  discount    Decimal  @default(0.00) @db.Decimal(15, 2)
+  subtotal    Decimal  @default(0.00) @db.Decimal(15, 2)
+  createdAt   DateTime @default(now()) @map("created_at")
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId])
+  @@map("invoice_items")
+}
+
+model InvoicePayment {
+  id            BigInt        @id @default(autoincrement())
+  invoiceId     BigInt        @map("invoice_id")
+  paymentDate   DateTime      @default(now()) @map("payment_date")
+  amount        Decimal       @db.Decimal(15, 2)
+  paymentMethod PaymentMethod @default(CASH) @map("payment_method")
+  referenceNo   String?       @map("reference_no") @db.VarChar(100)
+  createdBy     BigInt?       @map("created_by")
+  createdAt     DateTime      @default(now()) @map("created_at")
+  user          User?         @relation(fields: [createdBy], references: [id])
+  invoice       Invoice       @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId])
+  @@index([createdBy], map: "invoice_payments_created_by_fkey")
+  @@map("invoice_payments")
+}
+
+model Transaction {
+  id              BigInt                  @id @default(autoincrement())
+  userId          BigInt?                 @map("user_id")
+  type            TransactionType
+  transactionDate DateTime                @map("transaction_date") @db.Date
+  month           Int                     @default(0) @map("month")
+  year            Int                     @default(0) @map("year")
+  description     String?                 @db.VarChar(500)
+  categoryId      BigInt?                 @map("category_id")
+  amount          Decimal                 @db.Decimal(15, 2)
+  reference       String?                 @db.VarChar(100)
+  invoiceId       BigInt?                 @map("invoice_id")
+  createdAt       DateTime                @default(now()) @map("created_at")
+  updatedAt       DateTime?               @updatedAt @map("updated_at")
+  attachments     TransactionAttachment[]
+  category        Category?               @relation(fields: [categoryId], references: [id])
+  invoice         Invoice?                @relation(fields: [invoiceId], references: [id])
+  user            User?                   @relation(fields: [userId], references: [id])
+
+  @@index([userId, transactionDate])
+  @@index([type])
+  @@index([categoryId])
+  @@index([invoiceId])
+  @@map("transactions")
+}
+
+model TransactionAttachment {
+  id            BigInt      @id @default(autoincrement())
+  transactionId BigInt      @map("transaction_id")
+  filename      String      @db.VarChar(255)
+  filepath      String      @db.VarChar(255)
+  filesize      BigInt      @default(0)
+  mime          String?     @db.VarChar(100)
+  createdAt     DateTime    @default(now()) @map("created_at")
+  transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+
+  @@index([transactionId])
+  @@map("transaction_attachments")
+}
+
+model InvoiceTemplate {
+  id                 BigInt          @id @default(autoincrement())
+  name               String          @db.VarChar(255)
+  description        String?         @db.Text
+  isDefault          Boolean         @default(false) @map("is_default")
+  isActive           Boolean         @default(true) @map("is_active")
+  companyName        String          @map("company_name") @db.VarChar(255)
+  companyLogo        String?         @map("company_logo") @db.VarChar(500)
+  companyAddress     String?         @map("company_address") @db.Text
+  companyPhone       String?         @map("company_phone") @db.VarChar(50)
+  companyEmail       String?         @map("company_email") @db.VarChar(255)
+  companyWebsite     String?         @map("company_website") @db.VarChar(255)
+  taxId              String?         @map("tax_id") @db.VarChar(100)
+  primaryColor       String          @default("#000000") @map("primary_color") @db.VarChar(7)
+  secondaryColor     String          @default("#666666") @map("secondary_color") @db.VarChar(7)
+  accentColor        String          @default("#3b82f6") @map("accent_color") @db.VarChar(7)
+  fontFamily         String          @default("Arial, sans-serif") @map("font_family") @db.VarChar(100)
+  fontSizeBase       Int             @default(12) @map("font_size_base")
+  showLogo           Boolean         @default(true) @map("show_logo")
+  logoPosition       String          @default("left") @map("logo_position")
+  showCompanyDetails Boolean         @default(true) @map("show_company_details")
+  footerNotes        String?         @map("footer_notes") @db.Text
+  footerTerms        String?         @map("footer_terms") @db.Text
+  footerPaymentInfo  String?         @map("footer_payment_info") @db.Text
+  footerBankAccount  String?         @map("footer_bank_account") @db.Text
+  layoutStyle        String          @default("modern") @map("layout_style")
+  showWatermark      Boolean         @default(false) @map("show_watermark")
+  watermarkText      String?         @map("watermark_text") @db.VarChar(255)
+  createdBy          BigInt?         @map("created_by")
+  createdAt          DateTime        @default(now()) @map("created_at")
+  updatedAt          DateTime        @updatedAt @map("updated_at")
+  creator            User?           @relation("TemplateCreator", fields: [createdBy], references: [id])
+  invoices           Invoice[]
+  usage              TemplateUsage[]
+
+  @@index([isActive])
+  @@index([isDefault])
+  @@index([createdBy])
+  @@map("invoice_templates")
+}
+
+model TemplateUsage {
+  id         BigInt          @id @default(autoincrement())
+  templateId BigInt          @map("template_id")
+  invoiceId  BigInt          @map("invoice_id")
+  usedAt     DateTime        @default(now()) @map("used_at")
+  invoice    Invoice         @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  template   InvoiceTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@index([templateId])
+  @@index([usedAt])
+  @@index([invoiceId], map: "template_usage_invoice_id_fkey")
+  @@map("template_usage")
+}
+
+enum UserRole {
+  ADMIN
+  USER
+}
+
+enum TransactionType {
+  INCOME
+  EXPENSE
+}
+
+enum InvoiceStatus {
+  DRAFT
+  ISSUED
+  PARTIAL
+  PAID
+  CANCELLED
+}
+
+enum PaymentMethod {
+  CASH
+  TRANSFER
+  CARD
+  OTHER
+}

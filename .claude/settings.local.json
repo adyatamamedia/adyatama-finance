@@ -1,0 +1,39 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install:*)",
+      "Bash(npm run build:*)",
+      "Bash(npm run db:generate:*)",
+      "Bash(npx prisma generate:*)",
+      "Bash(npm run db:migrate:*)",
+      "Bash(mysql:*)",
+      "Bash(node:*)",
+      "Bash(where:*)",
+      "Bash(tasklist:*)",
+      "Bash(curl:*)",
+      "Bash(done)",
+      "Bash(npx prisma:*)",
+      "Bash(npm run db:seed:*)",
+      "Bash(git checkout:*)",
+      "Bash(tsx:*)",
+      "Bash(npx tsx:*)",
+      "Bash(find:*)",
+      "Bash(npm run dev:*)",
+      "Bash(nul:*)",
+      "Bash(npx tsc:*)",
+      "Bash(findstr:*)",
+      "Bash(\"C:\\xampp\\htdocs\\adyatama-finance\\app\\dashboard\\transactions\\page.tsx.tmp\")",
+      "Bash(\"C:\\xampp\\htdocs\\adyatama-finance\\app\\dashboard\\transactions\\page.tsx\")",
+      "Bash(cat:*)",
+      "Bash(timeout:*)",
+      "Bash(temp.tsx)",
+      "Bash(temp_start.tsx)",
+      "Bash(temp_end.tsx)",
+      "Bash(rm:*)",
+      "Bash(npm start)",
+      "Bash(netstat:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

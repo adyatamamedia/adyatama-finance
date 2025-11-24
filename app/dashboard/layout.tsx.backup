@@ -1,0 +1,139 @@
+'use client'
+
+import { useState, useEffect } from 'react'
+import { useRouter, usePathname } from 'next/navigation'
+import Link from 'next/link'
+
+export default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  const [user, setUser] = useState<any>(null)
+  const [sidebarShow, setSidebarShow] = useState(false)
+  const router = useRouter()
+  const pathname = usePathname()
+
+  useEffect(() => {
+    const userData = localStorage.getItem('user')
+    if (!userData) {
+      router.push('/')
+    } else {
+      setUser(JSON.parse(userData))
+    }
+  }, [router])
+
+  const handleLogout = () => {
+    localStorage.removeItem('user')
+    router.push('/')
+  }
+
+  const toggleSidebar = () => {
+    setSidebarShow(!sidebarShow)
+  }
+
+  const isActive = (path: string) => {
+    return pathname === path
+  }
+
+  if (!user) {
+    return null
+  }
+
+  const navigation = [
+    { href: '/dashboard', label: 'Dashboard', icon: '📊' },
+    { href: '/transactions', label: 'Transaksi', icon: '💰' },
+    { href: '/invoices', label: 'Invoice', icon: '🧾' },
+    { href: '/customers', label: 'Pelanggan', icon: '👥' },
+    ...(user.role === 'ADMIN' ? [
+      { href: '/categories', label: 'Kategori', icon: '📁' },
+      { href: '/settings', label: 'Pengaturan', icon: '⚙️' },
+      { href: '/users', label: 'Pengguna', icon: '👤' },
+    ] : []),
+  ]
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Top Navigation */}
+      <nav className="navbar bg-white shadow-sm border-b border-gray-200 px-4">
+        <div className="flex items-center justify-between w-full">
+          <div className="flex items-center">
+            <button
+              className="md:hidden p-2 rounded-md text-gray-600 hover:bg-gray-100"
+              onClick={toggleSidebar}
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
+            <Link href="/dashboard" className="text-blue-600 font-bold text-lg ml-2 md:ml-0">
+              ADYATAMA Finance
+            </Link>
+          </div>
+
+          <div className="flex items-center space-x-4">
+            <span className="text-gray-500 text-sm">
+              {user.name || user.username}
+            </span>
+            <button
+              onClick={handleLogout}
+              className="btn btn-outline-primary text-sm"
+            >
+              Logout
+            </button>
+          </div>
+        </div>
+      </nav>
+
+      <div className="flex">
+        {/* Sidebar - Desktop */}
+        <aside className="sidebar hidden md:block w-64 border-r border-gray-200">
+          <nav className="p-4">
+            {navigation.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`nav-link mb-2 ${isActive(item.href) ? 'active' : ''}`}
+              >
+                <span className="mr-3">{item.icon}</span>
+                {item.label}
+              </Link>
+            ))}
+          </nav>
+        </aside>
+
+        {/* Main Content */}
+        <main className="flex-1 p-6">
+          {children}
+        </main>
+      </div>
+
+      {/* Mobile Sidebar */}
+      {sidebarShow && (
+        <>
+          <aside className="sidebar fixed top-16 left-0 w-64 z-50 bg-white border-r border-gray-200 h-full">
+            <nav className="p-4">
+              {navigation.map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`nav-link mb-2 ${isActive(item.href) ? 'active' : ''}`}
+                  onClick={() => setSidebarShow(false)}
+                >
+                  <span className="mr-3">{item.icon}</span>
+                  {item.label}
+                </Link>
+              ))}
+            </nav>
+          </aside>
+
+          {/* Overlay */}
+          <div
+            className="fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden"
+            onClick={toggleSidebar}
+          ></div>
+        </>
+      )}
+    </div>
+  )
+}

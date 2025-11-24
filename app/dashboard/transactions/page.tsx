@@ -1,0 +1,1476 @@
+"use client"
+
+import { useState, useEffect, useCallback } from 'react'
+import { formatCurrency } from '@/lib/utils'
+import ImportTransactions from '@/components/ImportTransactions'
+
+// Helper function untuk format tanggal
+const formatDate = (dateString: string) => {
+  const date = new Date(dateString)
+  const options: Intl.DateTimeFormatOptions = {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric'
+  }
+  return date.toLocaleDateString('id-ID', options)
+}
+
+/** Types */
+interface Category {
+  id: string; // changed from number to string to match API response
+  name: string;
+  type?: string;
+}
+interface Transaction {
+  id: string
+  userId?: string | null
+  type: 'INCOME' | 'EXPENSE'
+  description: string
+  amount: string | number
+  category?: { id: string; name: string; type?: string } | null
+  transactionDate: string
+  user?: { id: string; name: string } | null
+  reference?: string | null
+  invoiceId?: string | null
+  createdAt: string
+  updatedAt: string
+  month?: number
+  year?: number
+  _count?: { attachments: number }
+}
+
+/** Main Page Component */
+export default function TransactionsPage() {
+  const [transactions, setTransactions] = useState<Transaction[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [showFormModal, setShowFormModal] = useState(false)
+  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null)
+  const [showImportModal, setShowImportModal] = useState(false)
+  const [showExportModal, setShowExportModal] = useState(false)
+  const [showErrorModal, setShowErrorModal] = useState<{ show: boolean; message: string }>({
+    show: false,
+    message: ''
+  })
+  const [categories, setCategories] = useState<{ id: string; name: string; type: string }[]>([])
+  const [searchQuery, setSearchQuery] = useState('')
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [totalTransactions, setTotalTransactions] = useState(0)
+  const [limit, setLimit] = useState(10) // transactions per page
+  const [sortBy, setSortBy] = useState<'date-desc' | 'date-asc'>('date-desc') // sorting
+
+  // Filter states
+  const [filters, setFilters] = useState({
+    month: '',
+    year: '',
+    categoryId: '',
+    type: '', // 'income', 'expense', or ''
+    search: ''
+  })
+  const [showFilters, setShowFilters] = useState(false)
+  const [success, setSuccess] = useState('')
+  const [deleteModal, setDeleteModal] = useState<{ show: boolean; transactionId: string; transactionDescription: string }>({
+    show: false,
+    transactionId: '',
+    transactionDescription: ''
+  })
+
+  // Export filter states
+  const [exportFilter, setExportFilter] = useState({
+    month: new Date().getMonth() + 1,
+    year: new Date().getFullYear(),
+    type: 'monthly' as 'monthly' | 'yearly' | 'all'
+  })
+
+  // Stable fetch function
+  const fetchTransactions = useCallback(async (page = 1, currentFilters = filters) => {
+    setLoading(true)
+    setError('')
+    try {
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: limit.toString(),
+        sortBy: sortBy
+      })
+
+      // Add filters to URL
+      if (currentFilters.search) {
+        params.append('search', currentFilters.search)
+      }
+      if (currentFilters.month) {
+        params.append('month', currentFilters.month)
+      }
+      if (currentFilters.year) {
+        params.append('year', currentFilters.year)
+      }
+      if (currentFilters.categoryId) {
+        params.append('categoryId', currentFilters.categoryId)
+      }
+      if (currentFilters.type) {
+        params.append('type', currentFilters.type.toLowerCase())
+      }
+
+      const response = await fetch(`/api/transactions?${params.toString()}`)
+      if (!response.ok) {
+        let errText = `HTTP ${response.status}`
+        try {
+          const json = await response.json()
+          errText = json.error || JSON.stringify(json)
+        } catch {
+          const text = await response.text().catch(() => '')
+          if (text) errText = text
+        }
+        throw new Error(`Failed to fetch transactions: ${errText}`)
+      }
+      const data = await response.json()
+      setTransactions(Array.isArray(data.transactions) ? data.transactions : [])
+      setTotalPages(data.pagination?.pages || 1)
+      setTotalTransactions(data.pagination?.total || 0)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred while fetching transactions')
+    } finally {
+      setLoading(false)
+    }
+  }, [limit, sortBy])
+
+  // Debounce search input
+  useEffect(() => {
+    const t = setTimeout(() => {
+      // Only update if search query actually changed
+      setFilters(prev => {
+        if (prev.search === searchQuery) return prev
+        return { ...prev, search: searchQuery }
+      })
+      setCurrentPage(1) // Reset to first page when searching
+    }, 300)
+    return () => clearTimeout(t)
+  }, [searchQuery])
+
+  useEffect(() => {
+    // fetch when currentPage, filters, limit, sortBy change
+    fetchTransactions(currentPage, filters)
+  }, [currentPage, filters, limit, sortBy])
+
+  // fetch categories once
+  useEffect(() => {
+    fetch('/api/categories')
+      .then(res => res.json())
+      .then(data => setCategories(Array.isArray(data) ? data : []))
+      .catch(() => setCategories([]))
+  }, [])
+
+  
+  const handleEdit = (transaction: Transaction) => {
+    if (!transaction?.id) {
+      console.error('Cannot edit transaction with missing ID:', transaction)
+      setShowErrorModal({ show: true, message: 'Tidak dapat mengedit transaksi: ID hilang' })
+      return
+    }
+    if (typeof transaction.id !== 'string' || transaction.id.trim() === '') {
+      console.error('Cannot edit transaction with invalid ID:', transaction)
+      setShowErrorModal({ show: true, message: 'Tidak dapat mengedit transaksi: format ID tidak valid' })
+      return
+    }
+    // Accept string IDs of various formats (UUID, numeric string, BigInt serialized)
+    setEditingTransaction(transaction)
+    setShowFormModal(true)
+  }
+
+  const handleDelete = async (id: string, description: string) => {
+    // Tampilkan modal konfirmasi
+    setDeleteModal({
+      show: true,
+      transactionId: id,
+      transactionDescription: description
+    })
+  }
+
+  const confirmDelete = async () => {
+    try {
+      const response = await fetch(`/api/transactions/${deleteModal.transactionId}`, {
+        method: 'DELETE',
+      })
+
+      if (!response.ok) {
+        let errorData
+        try {
+          errorData = await response.json()
+        } catch {
+          const text = await response.text().catch(() => '')
+          errorData = { error: text || `HTTP ${response.status}` }
+        }
+        throw new Error(errorData.error || 'Failed to delete transaction')
+      }
+
+      // Tutup modal
+      setDeleteModal({ show: false, transactionId: '', transactionDescription: '' })
+
+      // Tampilkan notifikasi sukses
+      setSuccess('Transaksi berhasil dihapus!')
+      setTimeout(() => setSuccess(''), 3000)
+
+      // refetch current page with current filters
+      await fetchTransactions(currentPage, filters)
+    } catch (err) {
+      setShowErrorModal({ show: true, message: 'Gagal menghapus transaksi: ' + (err instanceof Error ? err.message : 'Terjadi kesalahan') })
+    }
+  }
+
+  const cancelDelete = () => {
+    setDeleteModal({ show: false, transactionId: '', transactionDescription: '' })
+  }
+
+  // Handle filter changes
+  const handleFilterChange = (key: string, value: string) => {
+    setFilters(prev => ({ ...prev, [key]: value }))
+    setCurrentPage(1) // Reset to first page when filter changes
+  }
+
+  // Handle limit change
+  const handleLimitChange = (newLimit: number) => {
+    setLimit(newLimit)
+    setCurrentPage(1) // Reset to first page when limit changes
+  }
+
+  // Handle sort change
+  const handleSortChange = (newSortBy: 'date-desc' | 'date-asc') => {
+    setSortBy(newSortBy)
+  }
+
+  // Clear all filters
+  const clearFilters = () => {
+    setFilters({
+      month: '',
+      year: '',
+      categoryId: '',
+      type: '',
+      search: ''
+    })
+    setSearchQuery('')
+    setCurrentPage(1)
+  }
+
+  // Check if any filters are active
+  const hasActiveFilters = Boolean(filters.month || filters.year || filters.categoryId || filters.type || filters.search)
+
+  // Fetch transactions for export with filters
+  const fetchTransactionsForExport = async () => {
+    try {
+      const params = new URLSearchParams({
+        limit: '10000' // Large limit for export
+      })
+
+      // Apply display filters OR export-specific filters
+      if (exportFilter.type === 'monthly') {
+        params.append('month', exportFilter.month.toString())
+        params.append('year', exportFilter.year.toString())
+      } else if (exportFilter.type === 'yearly') {
+        params.append('year', exportFilter.year.toString())
+      } else {
+        // Use current display filters when exporting all data
+        if (filters.month) params.append('month', filters.month)
+        if (filters.year) params.append('year', filters.year)
+        if (filters.categoryId) params.append('categoryId', filters.categoryId)
+        if (filters.type) params.append('type', filters.type.toLowerCase())
+        if (filters.search) params.append('search', filters.search)
+      }
+
+      const response = await fetch(`/api/transactions?${params.toString()}`)
+      if (!response.ok) throw new Error('Failed to fetch transactions for export')
+
+      const data = await response.json()
+      return Array.isArray(data.transactions) ? data.transactions : []
+    } catch (err) {
+      console.error('Error fetching transactions for export:', err)
+      return []
+    }
+  }
+
+  // Utility: escape CSV cell (double quotes inside)
+  const csvEscape = (v: string) => {
+    const s = String(v ?? '')
+    return `"${s.replace(/"/g, '""')}"`
+  }
+
+  // Function to format data for export
+  const formatTransactionsForExport = (data: Transaction[]) => {
+    return data.map((t: Transaction, index: number) => {
+      const amtNum = typeof t.amount === 'string' ? parseFloat(t.amount) : (typeof t.amount === 'number' ? t.amount : 0)
+      return {
+        no: index + 1,
+        tanggal: formatDate(t.transactionDate),
+        deskripsi: t.description || '-',
+        kategori: t.category?.name || '-',
+        jenis: t.type === 'INCOME' ? 'Pemasukan' : 'Pengeluaran',
+        jumlah: `${t.type === 'INCOME' ? '+' : '-'}${formatCurrency(amtNum)}`,
+        jumlah_angka: amtNum
+      }
+    })
+  }
+
+  // Export functions with filters
+  const exportToCSV = async () => {
+    const exportData = await fetchTransactionsForExport()
+    const formattedData = formatTransactionsForExport(exportData)
+    if (formattedData.length === 0) {
+      setShowErrorModal({ show: true, message: 'Tidak ada data untuk diekspor' })
+      return
+    }
+
+    const headers = ['No.', 'Tanggal', 'Deskripsi', 'Kategori', 'Jenis', 'Jumlah']
+    const rows = [
+      headers.join(','),
+      ...formattedData.map(row => [
+        csvEscape(row.no.toString()),
+        csvEscape(row.tanggal),
+        csvEscape(row.deskripsi),
+        csvEscape(row.kategori),
+        csvEscape(row.jenis),
+        csvEscape(row.jumlah)
+      ].join(','))
+    ]
+
+    // prepend BOM for Excel-friendly UTF-8
+    const csvContent = '\uFEFF' + rows.join('\n')
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+
+    // Generate filename based on filter
+    const date = new Date()
+    let filename = 'transaksi_'
+    if (exportFilter.type === 'monthly') {
+      filename += `${date.getFullYear()}_${String(exportFilter.month).padStart(2, '0')}`
+    } else if (exportFilter.type === 'yearly') {
+      filename += `${date.getFullYear()}`
+    } else {
+      filename += date.toISOString().split('T')[0]
+    }
+    filename += '.csv'
+
+    link.setAttribute('href', url)
+    link.setAttribute('download', filename)
+    link.style.visibility = 'hidden'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
+
+  const exportToExcel = async () => {
+    const exportData = await fetchTransactionsForExport()
+    const formattedData = formatTransactionsForExport(exportData)
+    if (formattedData.length === 0) {
+      setShowErrorModal({ show: true, message: 'Tidak ada data untuk diekspor' })
+      return
+    }
+
+    let htmlContent = '<table border="1"><thead><tr>'
+    htmlContent += '<th>No.</th><th>Tanggal</th><th>Deskripsi</th><th>Kategori</th><th>Jenis</th><th>Jumlah</th>'
+    htmlContent += '</tr></thead><tbody>'
+    formattedData.forEach(row => {
+      htmlContent += `<tr><td>${row.no}</td><td>${row.tanggal}</td><td>${row.deskripsi}</td><td>${row.kategori}</td><td>${row.jenis}</td><td>${row.jumlah}</td></tr>`
+    })
+    htmlContent += '</tbody></table>'
+
+    const blob = new Blob([htmlContent], { type: 'application/vnd.ms-excel' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+
+    // Generate filename based on filter
+    const date = new Date()
+    let filename = 'transaksi_'
+    if (exportFilter.type === 'monthly') {
+      filename += `${date.getFullYear()}_${String(exportFilter.month).padStart(2, '0')}`
+    } else if (exportFilter.type === 'yearly') {
+      filename += `${date.getFullYear()}`
+    } else {
+      filename += date.toISOString().split('T')[0]
+    }
+    filename += '.xls'
+
+    link.setAttribute('href', url)
+    link.setAttribute('download', filename)
+    link.style.visibility = 'hidden'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
+
+  const exportToPDF = async () => {
+    const exportData = await fetchTransactionsForExport()
+    const formattedData = formatTransactionsForExport(exportData)
+    if (formattedData.length === 0) {
+      setShowErrorModal({ show: true, message: 'Tidak ada data untuk diekspor' })
+      return
+    }
+
+    const income = exportData
+      .filter((t: Transaction) => t.type === 'INCOME')
+      .reduce((sum: number, t: Transaction) => sum + (typeof t.amount === 'string' ? parseFloat(t.amount) : (typeof t.amount === 'number' ? t.amount : 0)), 0)
+
+    const expense = exportData
+      .filter((t: Transaction) => t.type === 'EXPENSE')
+      .reduce((sum: number, t: Transaction) => sum + (typeof t.amount === 'string' ? parseFloat(t.amount) : (typeof t.amount === 'number' ? t.amount : 0)), 0)
+
+    const printWindow = window.open('', '_blank')
+    if (!printWindow) {
+      setShowErrorModal({ show: true, message: 'Harap izinkan popup untuk mengekspor ke PDF' })
+      return
+    }
+
+    // Generate report title based on filter
+    let reportTitle = 'Laporan Transaksi'
+    let periodText = ''
+    const monthNames = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember']
+
+    if (exportFilter.type === 'monthly') {
+      reportTitle = 'Laporan Transaksi Bulanan'
+      periodText = `Periode: ${monthNames[exportFilter.month - 1]} ${exportFilter.year}`
+    } else if (exportFilter.type === 'yearly') {
+      reportTitle = 'Laporan Transaksi Tahunan'
+      periodText = `Periode: Tahun ${exportFilter.year}`
+    } else {
+      periodText = `Semua Data`
+    }
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>${reportTitle}</title>
+        <meta charset="utf-8" />
+        <style>
+          body { font-family: Arial, sans-serif; margin: 20px; }
+          table { border-collapse: collapse; width: 100%; }
+          th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+          th { background-color: #f2f2f2; }
+          .header { text-align: center; margin-bottom: 20px; }
+          .summary { margin: 20px 0; }
+          .summary p { margin: 5px 0; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>${reportTitle}</h1>
+          <p>Dicetak pada: ${new Date().toLocaleString('id-ID')}</p>
+          <p>${periodText}</p>
+        </div>
+
+        <div class="summary">
+          <h3>Ringkasan</h3>
+          <p>Total Transaksi: ${formattedData.length}</p>
+          <p>Pemasukan: ${formatCurrency(income)}</p>
+          <p>Pengeluaran: ${formatCurrency(expense)}</p>
+          <p><strong>Saldo: ${formatCurrency(income - expense)}</strong></p>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>No.</th>
+              <th>Tanggal</th>
+              <th>Deskripsi</th>
+              <th>Kategori</th>
+              <th>Jenis</th>
+              <th>Jumlah</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${formattedData.map(row => `
+              <tr>
+                <td>${row.no}</td>
+                <td>${row.tanggal}</td>
+                <td>${row.deskripsi}</td>
+                <td>${row.kategori}</td>
+                <td>${row.jenis}</td>
+                <td>${row.jumlah}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+
+        <div class="footer" style="margin-top: 30px; text-align: center; font-size: 12px; color: #666;">
+          <p>Laporan ini dicetak otomatis dari Sistem Keuangan Adyatama Finance</p>
+        </div>
+      </body>
+      </html>
+    `
+
+    printWindow.document.write(htmlContent)
+    printWindow.document.close()
+    printWindow.onload = () => {
+      printWindow.print()
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="p-6">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-gray-500">Loading transactions...</div>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="p-6">
+        <div className="bg-red-50 border border-red-200 rounded-md p-4">
+          <div className="text-red-800">{error}</div>
+        </div>
+      </div>
+    )
+  }
+
+  const income = (transactions || [])
+    .filter((t: Transaction) => t.type === 'INCOME')
+    .reduce((sum: number, t: Transaction) => sum + (typeof t.amount === 'string' ? parseFloat(t.amount) : (typeof t.amount === 'number' ? t.amount : 0)), 0)
+
+  const expense = (transactions || [])
+    .filter((t: Transaction) => t.type === 'EXPENSE')
+    .reduce((sum: number, t: Transaction) => sum + (typeof t.amount === 'string' ? parseFloat(t.amount) : (typeof t.amount === 'number' ? t.amount : 0)), 0)
+
+  return (
+    <div className="px-3 sm:px-4 lg:px-6 py-4 lg:py-6">
+      {success && (
+        <div className="mb-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative" role="alert">
+          <strong className="font-bold">Sukses! </strong>
+          <span className="block sm:inline">{success}</span>
+        </div>
+      )}
+      <div className="mb-4 sm:mb-6">
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">Transaksi</h1>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4 mb-4 sm:mb-6">
+          <div className="bg-green-50 border border-green-200 rounded-lg p-3 sm:p-4">
+            <div className="flex items-center gap-2 mb-1">
+              <svg className="w-4 h-4 sm:w-5 sm:h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+              </svg>
+              <div className="text-green-600 text-xs sm:text-sm font-medium">Pemasukan</div>
+            </div>
+            <div className="text-lg sm:text-2xl font-bold text-green-700">{formatCurrency(income)}</div>
+          </div>
+          <div className="bg-red-50 border border-red-200 rounded-lg p-3 sm:p-4">
+            <div className="flex items-center gap-2 mb-1">
+              <svg className="w-4 h-4 sm:w-5 sm:h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6" />
+              </svg>
+              <div className="text-red-600 text-xs sm:text-sm font-medium">Pengeluaran</div>
+            </div>
+            <div className="text-lg sm:text-2xl font-bold text-red-700">{formatCurrency(expense)}</div>
+          </div>
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 sm:p-4">
+            <div className="flex items-center gap-2 mb-1">
+              <svg className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+              </svg>
+              <div className="text-blue-600 text-xs sm:text-sm font-medium">Saldo</div>
+            </div>
+            <div className="text-lg sm:text-2xl font-bold text-blue-700">{formatCurrency(income - expense)}</div>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 lg:ml-auto">
+          {/* Search Bar - Full width on mobile, takes remaining space on desktop */}
+          <div className="flex-1 lg:max-w-md">
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </div>
+              <input
+                type="text"
+                placeholder="Cari transaksi (deskripsi, kategori)..."
+                className="form-input w-full pl-10 pr-4 py-2"
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value)
+                  setCurrentPage(1)
+                }}
+              />
+            </div>
+          </div>
+                      {/* Filter Buttons */}
+            <div className="flex items-center gap-2 border-l pl-2 border-gray-300">
+              <button
+                onClick={() => setShowFilters(!showFilters)}
+                className={`btn flex items-center gap-2 ${hasActiveFilters ? 'btn-primary' : 'btn-secondary'}`}
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.707A1 1 0 013 7V4z" />
+                </svg>
+                <span className="hidden sm:inline">Filter</span>
+                {hasActiveFilters && (
+                  <span className="bg-white text-blue-600 text-xs px-2 py-1 rounded-full">Aktif</span>
+                )}
+              </button>
+
+              {hasActiveFilters && (
+                <button
+                  onClick={clearFilters}
+                  className="btn btn-secondary flex items-center gap-2"
+                  title="Hapus semua filter"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                  <span className="hidden sm:inline">Reset</span>
+                </button>
+              )}
+            </div>
+
+          {/* Filter & Action Buttons */}
+        <div className="flex flex-wrap items-center gap-2 lg:ml-auto">
+            {/* Action Buttons */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  setEditingTransaction(null)
+                  setShowFormModal(true)
+                }}
+                className="btn btn-primary flex items-center gap-2"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+                </svg>
+                <span className="hidden sm:inline">Tambah</span>
+              </button>
+
+              <button
+                onClick={() => setShowImportModal(true)}
+                className="btn btn-secondary flex items-center gap-2"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                </svg>
+                <span className="hidden sm:inline">Import</span>
+              </button>
+
+              <button
+                onClick={() => setShowExportModal(true)}
+                className="btn btn-secondary flex items-center gap-2"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                <span className="hidden sm:inline">Export</span>
+              </button>
+            </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Filter Panel */}
+        {showFilters && (
+          <div className="bg-white border border-gray-200 rounded-lg p-3 sm:p-4 mb-4 sm:mb-6">
+            <h3 className="text-lg font-semibold mb-4">Filter Transaksi</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
+              {/* Filter Bulan */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Bulan</label>
+                <select
+                  value={filters.month}
+                  onChange={(e) => handleFilterChange('month', e.target.value)}
+                  className="form-input text-sm"
+                >
+                  <option value="">Semua Bulan</option>
+                  <option value="1">Januari</option>
+                  <option value="2">Februari</option>
+                  <option value="3">Maret</option>
+                  <option value="4">April</option>
+                  <option value="5">Mei</option>
+                  <option value="6">Juni</option>
+                  <option value="7">Juli</option>
+                  <option value="8">Agustus</option>
+                  <option value="9">September</option>
+                  <option value="10">Oktober</option>
+                  <option value="11">November</option>
+                  <option value="12">Desember</option>
+                </select>
+              </div>
+
+              {/* Filter Tahun */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Tahun</label>
+                <select
+                  value={filters.year}
+                  onChange={(e) => handleFilterChange('year', e.target.value)}
+                  className="form-input text-sm"
+                >
+                  <option value="">Semua Tahun</option>
+                  {Array.from({ length: 5 }, (_, i) => {
+                    const year = new Date().getFullYear() - 2 + i
+                    return <option key={year} value={year}>{year}</option>
+                  })}
+                </select>
+              </div>
+
+              {/* Filter Kategori */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Kategori</label>
+                <select
+                  value={filters.categoryId}
+                  onChange={(e) => handleFilterChange('categoryId', e.target.value)}
+                  className="form-input text-sm"
+                >
+                  <option value="">Semua Kategori</option>
+                  {categories.map((cat) => (
+                    <option key={cat.id} value={cat.id}>{cat.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Filter Tipe Transaksi */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Tipe</label>
+                <select
+                  value={filters.type}
+                  onChange={(e) => handleFilterChange('type', e.target.value)}
+                  className="form-input text-sm"
+                >
+                  <option value="">Semua Tipe</option>
+                  <option value="income">Pemasukan</option>
+                  <option value="expense">Pengeluaran</option>
+                </select>
+              </div>
+
+              {/* Filter Actions */}
+              <div className="flex items-end gap-2">
+                <button
+                  onClick={clearFilters}
+                  className="btn btn-secondary text-sm flex-1"
+                >
+                  Reset
+                </button>
+                <button
+                  onClick={() => setShowFilters(false)}
+                  className="btn btn-primary text-sm flex-1"
+                >
+                  Tutup
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Table Controls */}
+        <div className="bg-white border border-gray-200 rounded-lg p-3 sm:p-4 mb-4">
+          {/* Mobile Layout */}
+          <div className="flex flex-col gap-2 sm:hidden">
+            {/* Combined controls in single row */}
+            <div className="flex items-center justify-between gap-2">
+              {/* Show entries - left side */}
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Tampilkan</label>
+                <select
+                  value={limit}
+                  onChange={(e) => handleLimitChange(parseInt(e.target.value))}
+                  className="form-input text-sm w-14 border-gray-300 bg-white"
+                >
+                  <option value={10}>10</option>
+                  <option value={25}>25</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                </select>
+                <span className="text-xs text-gray-600 whitespace-nowrap">data</span>
+              </div>
+
+              {/* Divider */}
+              <div className="w-px h-6 bg-gray-300 flex-shrink-0"></div>
+
+              {/* Sort controls - right side */}
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Urutkan:</label>
+                <select
+                  value={sortBy}
+                  onChange={(e) => handleSortChange(e.target.value as 'date-desc' | 'date-asc')}
+                  className="form-input text-sm border-gray-300 bg-white min-w-[100px]"
+                >
+                  <option value="date-desc">Terbaru</option>
+                  <option value="date-asc">Terlama</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* Desktop/Tablet Layout */}
+          <div className="hidden sm:flex justify-between items-center">
+            {/* Show entries dropdown */}
+            <div className="flex items-center gap-2">
+              <label className="text-sm text-gray-700">Tampilkan</label>
+              <select
+                value={limit}
+                onChange={(e) => handleLimitChange(parseInt(e.target.value))}
+                className="form-input text-sm w-20"
+              >
+                <option value={10}>10</option>
+                <option value={25}>25</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+              </select>
+              <label className="text-sm text-gray-700">entries</label>
+            </div>
+
+            {/* Sort controls */}
+            <div className="flex items-center gap-2">
+              <label className="text-sm text-gray-700">Urutkan:</label>
+              <select
+                value={sortBy}
+                onChange={(e) => handleSortChange(e.target.value as 'date-desc' | 'date-asc')}
+                className="form-input text-sm"
+              >
+                <option value="date-desc">Tanggal Terbaru</option>
+                <option value="date-asc">Tanggal Terlama</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+          {/* Desktop Table */}
+          <div className="hidden lg:block overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">No.</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tanggal</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Deskripsi</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Kategori</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Jenis</th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Jumlah</th>
+                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Aksi</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {transactions.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="px-6 py-4 text-center text-gray-500">Belum ada transaksi</td>
+                  </tr>
+                ) : (
+                  transactions.map((transaction, index) => {
+                    const amtNum = typeof transaction.amount === 'string' ? parseFloat(transaction.amount) : (typeof transaction.amount === 'number' ? transaction.amount : 0)
+                    const rowNumber = (currentPage - 1) * limit + index + 1
+                    return (
+                      <tr key={transaction.id}>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-center">{rowNumber}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{formatDate(transaction.transactionDate)}</td>
+                        <td className="px-6 py-4 text-sm text-gray-900">{transaction.description || '-'}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{transaction.category?.name || '-'}</td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${transaction.type === 'INCOME' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                            {transaction.type === 'INCOME' ? 'Pemasukan' : 'Pengeluaran'}
+                          </span>
+                        </td>
+                        <td className={`px-6 py-4 whitespace-nowrap text-sm font-medium text-right ${transaction.type === 'INCOME' ? 'text-green-600' : 'text-red-600'}`}>
+                          {transaction.type === 'INCOME' ? '+' : '-'}{formatCurrency(amtNum)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
+                          <button
+                            onClick={() => handleEdit(transaction)}
+                            className="inline-flex items-center justify-center w-8 h-8 rounded-md bg-blue-100 text-blue-600 hover:bg-blue-200 hover:text-blue-700 transition-colors duration-200 mr-2"
+                            title="Edit Transaksi"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                          </button>
+                          <button
+                            onClick={() => handleDelete(transaction.id, transaction.description || 'transaksi ini')}
+                            className="inline-flex items-center justify-center w-8 h-8 rounded-md bg-red-100 text-red-600 hover:bg-red-200 hover:text-red-700 transition-colors duration-200"
+                            title="Hapus Transaksi"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
+                        </td>
+                      </tr>
+                    )
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Mobile Card View */}
+          <div className="lg:hidden">
+            {transactions.length === 0 ? (
+              <div className="p-6 text-center text-gray-500">
+                <svg className="mx-auto h-12 w-12 text-gray-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                <div className="text-sm font-medium text-gray-900 mb-1">Belum ada transaksi</div>
+                <div className="text-xs text-gray-500">Tambah transaksi pertama Anda untuk memulai</div>
+              </div>
+            ) : (
+              <div className="divide-y divide-gray-100">
+                {transactions.map((transaction, index) => {
+                  const amtNum = typeof transaction.amount === 'string' ? parseFloat(transaction.amount) : (typeof transaction.amount === 'number' ? transaction.amount : 0)
+                  const rowNumber = (currentPage - 1) * limit + index + 1
+                  return (
+                    <div key={transaction.id} className="bg-white hover:bg-gray-50 transition-colors">
+                      <div className="px-4 py-3">
+                        {/* Main Content Row */}
+                        <div className="flex items-start justify-between mb-2">
+                          {/* Left side: Number, Type, Description */}
+                          <div className="flex-1 min-w-0 mr-3">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="inline-flex items-center justify-center w-5 h-5 text-xs font-semibold text-white bg-gray-400 rounded-full flex-shrink-0">
+                                {rowNumber}
+                              </span>
+                              <span className={`inline-flex px-1.5 py-0.5 text-xs font-medium rounded ${transaction.type === 'INCOME' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                {transaction.type === 'INCOME' ? 'Pemasukan' : 'Pengeluaran'}
+                              </span>
+                            </div>
+                            <div className="text-sm font-medium text-gray-900 truncate pr-2">
+                              {transaction.description || 'Tanpa deskripsi'}
+                            </div>
+                            <div className="text-xs text-gray-500 mt-0.5 flex items-center">
+                              <svg className="w-3 h-3 mr-1 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                              </svg>
+                              {formatDate(transaction.transactionDate)}
+                            </div>
+                          </div>
+
+                          {/* Right side: Amount */}
+                          <div className="flex flex-col items-end">
+                            <div className={`text-base font-bold ${transaction.type === 'INCOME' ? 'text-green-600' : 'text-red-600'}`}>
+                              {transaction.type === 'INCOME' ? '+' : '-'}{formatCurrency(amtNum)}
+                            </div>
+                            {/* Category Badge */}
+                            {transaction.category?.name && (
+                              <span className="inline-flex items-center px-1.5 py-0.5 text-xs font-medium text-blue-700 bg-blue-50 rounded mt-1 max-w-full truncate">
+                                {transaction.category.name}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Action Bar */}
+                        <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+                          <div className="text-xs text-gray-400">
+                            ID: {transaction.id.slice(-8)}
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => handleEdit(transaction)}
+                              className="inline-flex items-center justify-center p-1.5 text-xs font-medium text-blue-600 bg-blue-50 rounded hover:bg-blue-100 transition-colors"
+                              title="Edit"
+                            >
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                              </svg>
+                              <span className="ml-1 hidden sm:inline">Edit</span>
+                            </button>
+                            <button
+                              onClick={() => handleDelete(transaction.id, transaction.description || 'transaksi ini')}
+                              className="inline-flex items-center justify-center p-1.5 text-xs font-medium text-red-600 bg-red-50 rounded hover:bg-red-100 transition-colors"
+                              title="Hapus"
+                            >
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                              <span className="ml-1 hidden sm:inline">Hapus</span>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+
+          {totalPages > 1 && (
+            <div className="bg-white border-t border-gray-200">
+              {/* Mobile Pagination */}
+              <div className="lg:hidden px-4 py-3">
+                <div className="flex flex-col gap-3">
+                  {/* Info Text */}
+                  <div className="text-center text-xs text-gray-600">
+                    Menampilkan <span className="font-medium">{(currentPage - 1) * limit + 1}</span>-<span className="font-medium">{Math.min(currentPage * limit, totalTransactions)}</span> dari <span className="font-medium">{totalTransactions}</span> data
+                  </div>
+
+                  {/* Page Navigation */}
+                  <div className="flex items-center justify-between">
+                    <button
+                      onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                      disabled={currentPage === 1}
+                      className={`flex items-center gap-1 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
+                        currentPage === 1
+                          ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                          : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 active:bg-gray-100'
+                      }`}
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+                      </svg>
+                      <span>Sebelumnya</span>
+                    </button>
+
+                    <div className="flex items-center gap-1">
+                      <span className="px-3 py-1 bg-blue-600 text-white text-sm font-medium rounded-lg min-w-[80px] text-center">
+                        {currentPage}/{totalPages}
+                      </span>
+                    </div>
+
+                    <button
+                      onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                      disabled={currentPage === totalPages}
+                      className={`flex items-center gap-1 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
+                        currentPage === totalPages
+                          ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                          : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 active:bg-gray-100'
+                      }`}
+                    >
+                      <span>Selanjutnya</span>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Desktop Pagination */}
+              <div className="hidden lg:block px-6 py-4">
+                <div className="flex items-center justify-between">
+                  <div className="text-sm text-gray-700">
+                    Showing <span className="font-medium">{(currentPage - 1) * limit + 1}</span> to <span className="font-medium">{Math.min(currentPage * limit, totalTransactions)}</span> of <span className="font-medium">{totalTransactions}</span> results
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    {/* Previous Button */}
+                    <button
+                      onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                      disabled={currentPage === 1}
+                      className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                        currentPage === 1
+                          ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                          : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                      }`}
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+                      </svg>
+                      Previous
+                    </button>
+
+                    {/* Page Info */}
+                    <div className="flex items-center gap-2">
+                      <span className="px-4 py-2 bg-blue-50 text-blue-700 text-sm font-medium border border-blue-200 rounded-md min-w-[100px] text-center">
+                        Page {currentPage} of {totalPages}
+                      </span>
+                    </div>
+
+                    {/* Next Button */}
+                    <button
+                      onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                      disabled={currentPage === totalPages}
+                      className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                        currentPage === totalPages
+                          ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                          : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                      }`}
+                    >
+                      Next
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Modal Form Tambah/Edit Transaksi */}
+{showFormModal && (
+  <div className="fixed inset-0 bg-gray-600 bg-opacity-50 z-50 flex items-center justify-center p-4">
+    <div className="w-full max-w-lg sm:max-w-2xl max-h-[90vh] overflow-auto p-4 sm:p-5 border shadow-lg rounded-md bg-white">
+      <div className="flex justify-between items-center mb-4">
+        <h3 className="text-lg font-semibold text-gray-900">
+          {editingTransaction ? 'Edit Transaksi' : 'Tambah Transaksi Baru'}
+        </h3>
+        <button
+          onClick={() => {
+            setShowFormModal(false)
+            setEditingTransaction(null)
+          }}
+          className="text-gray-400 hover:text-gray-600"
+        >
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <TransactionForm
+        onSuccess={() => {
+          setShowFormModal(false)
+          setEditingTransaction(null)
+          fetchTransactions(1, filters)
+          setCurrentPage(1)
+          if (editingTransaction) {
+            setSuccess('Transaksi berhasil diperbarui!')
+          } else {
+            setSuccess('Transaksi berhasil ditambahkan!')
+          }
+          setTimeout(() => setSuccess(''), 3000)
+        }}
+        onCancel={() => {
+          setShowFormModal(false)
+          setEditingTransaction(null)
+        }}
+        editingTransaction={editingTransaction}
+        categories={categories}
+      />
+    </div>
+  </div>
+)}
+
+
+        {/* Modal Import Transaksi */}
+{showImportModal && (
+  <div className="fixed inset-0 bg-gray-600 bg-opacity-50 z-50 flex items-center justify-center p-4">
+    <div className="w-full max-w-lg sm:max-w-2xl max-h-[90vh] overflow-auto p-4 sm:p-5 border shadow-lg rounded-md bg-white">
+      <div className="flex justify-between items-center mb-4">
+        <h3 className="text-lg font-semibold text-gray-900">Import Transaksi</h3>
+        <button onClick={() => setShowImportModal(false)} className="text-gray-400 hover:text-gray-600">
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+      <ImportTransactions
+        onSuccess={() => {
+          setShowImportModal(false)
+          fetchTransactions(currentPage, filters)
+        }}
+        categories={categories}
+      />
+    </div>
+  </div>
+)}
+
+
+        {/* Modal Export */}
+        {showExportModal && (
+  <div className="fixed inset-0 bg-gray-600 bg-opacity-50 z-50 flex items-center justify-center p-4">
+    <div className="w-full max-w-xs max-h-[90vh] overflow-auto p-5 border shadow-lg rounded-md bg-white">
+      <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-semibold text-gray-900">Export Transaksi</h3>
+                <button
+                  onClick={() => setShowExportModal(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Tipe Laporan</label>
+                  <select
+                    value={exportFilter.type}
+                    onChange={(e) => setExportFilter({ ...exportFilter, type: e.target.value as 'monthly' | 'yearly' | 'all' })}
+                    className="form-input w-full"
+                  >
+                    <option value="all">Semua Data</option>
+                    <option value="monthly">Bulanan</option>
+                    <option value="yearly">Tahunan</option>
+                  </select>
+                </div>
+
+                {(exportFilter.type === 'monthly' || exportFilter.type === 'yearly') && (
+                  <div className="grid grid-cols-2 gap-3">
+                    {exportFilter.type === 'monthly' && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Bulan</label>
+                        <select
+                          value={exportFilter.month}
+                          onChange={(e) => setExportFilter({ ...exportFilter, month: parseInt(e.target.value) })}
+                          className="form-input w-full"
+                        >
+                          <option value={1}>Januari</option>
+                          <option value={2}>Februari</option>
+                          <option value={3}>Maret</option>
+                          <option value={4}>April</option>
+                          <option value={5}>Mei</option>
+                          <option value={6}>Juni</option>
+                          <option value={7}>Juli</option>
+                          <option value={8}>Agustus</option>
+                          <option value={9}>September</option>
+                          <option value={10}>Oktober</option>
+                          <option value={11}>November</option>
+                          <option value={12}>Desember</option>
+                        </select>
+                      </div>
+                    )}
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Tahun</label>
+                      <select
+                        value={exportFilter.year}
+                        onChange={(e) => setExportFilter({ ...exportFilter, year: parseInt(e.target.value) })}
+                        className="form-input w-full"
+                      >
+                        {Array.from({ length: 5 }, (_, i) => {
+                          const year = new Date().getFullYear() - 2 + i
+                          return <option key={year} value={year}>{year}</option>
+                        })}
+                      </select>
+                    </div>
+                  </div>
+                )}
+
+                <div className="border-t pt-4">
+                  <p className="text-sm font-medium text-gray-700 mb-3">Format Export:</p>
+                  <div className="grid grid-cols-3 gap-2">
+                    <button
+                      onClick={() => {
+                        exportToPDF()
+                        setShowExportModal(false)
+                      }}
+                      className="px-3 py-2 bg-red-50 text-red-700 text-sm rounded hover:bg-red-100 transition-colors"
+                    >
+                      PDF
+                    </button>
+                    <button
+                      onClick={() => {
+                        exportToExcel()
+                        setShowExportModal(false)
+                      }}
+                      className="px-3 py-2 bg-green-50 text-green-700 text-sm rounded hover:bg-green-100 transition-colors"
+                    >
+                      Excel
+                    </button>
+                    <button
+                      onClick={() => {
+                        exportToCSV()
+                        setShowExportModal(false)
+                      }}
+                      className="px-3 py-2 bg-blue-50 text-blue-700 text-sm rounded hover:bg-blue-100 transition-colors"
+                    >
+                      CSV
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal Error */}
+        {showErrorModal.show && (
+  <div className="fixed inset-0 bg-gray-600 bg-opacity-50 z-50 flex items-center justify-center p-4">
+    <div className="w-full max-w-xs max-h-[90vh] overflow-auto p-5 border shadow-lg rounded-md bg-white">
+      <div className="mt-3 text-center">
+                <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 mb-4">
+                  <svg className="h-6 w-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                </div>
+                <h3 className="text-lg leading-6 font-medium text-gray-900">Error</h3>
+                <div className="mt-2 px-7 py-3">
+                  <p className="text-sm text-gray-500">{showErrorModal.message}</p>
+                </div>
+                <div className="items-center px-4 py-3">
+                  <button
+                    onClick={() => setShowErrorModal({ show: false, message: '' })}
+                    className="px-4 py-2 bg-gray-300 text-gray-800 text-base font-medium rounded-md shadow-sm hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-300 w-full"
+                  >
+                    Tutup
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal Konfirmasi Hapus */}
+        {deleteModal.show && (
+  <div className="fixed inset-0 bg-gray-600 bg-opacity-50 z-50 flex items-center justify-center p-4">
+    <div className="w-full max-w-xs max-h-[90vh] overflow-auto p-5 border shadow-lg rounded-md bg-white">
+      <div className="mt-3 text-center">
+                <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 mb-4">
+                  <svg className="h-6 w-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                </div>
+                <h3 className="text-lg leading-6 font-medium text-gray-900">Konfirmasi Hapus</h3>
+                <div className="mt-2 px-7 py-3">
+                  <p className="text-sm text-gray-500">
+                    Apakah Anda yakin ingin menghapus transaksi &#34;{deleteModal.transactionDescription}&#34;?
+                  </p>
+                  <p className="text-xs text-gray-400 mt-2">Tindakan ini tidak dapat dibatalkan.</p>
+                </div>
+                <div className="items-center px-4 py-3">
+                  <div className="flex justify-center space-x-4">
+                    <button
+                      onClick={cancelDelete}
+                      className="px-4 py-2 bg-gray-300 text-gray-800 text-base font-medium rounded-md shadow-sm hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-300"
+                    >
+                      Batal
+                    </button>
+                    <button
+                      onClick={confirmDelete}
+                      className="px-4 py-2 bg-red-600 text-white text-base font-medium rounded-md shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500"
+                    >
+                      Oke, Hapus
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+  )
+}
+
+/* ------------------
+   TransactionForm
+   ------------------ */
+
+type TransactionFormProps = {
+  editingTransaction?: Transaction | null
+  categories: Category[]
+  onSuccess?: (data?: Transaction) => void
+  onCancel?: () => void
+}
+
+function TransactionForm({ editingTransaction = null, categories = [], onSuccess, onCancel }: TransactionFormProps) {
+  const isEdit = !!editingTransaction
+  const [type, setType] = useState<'INCOME' | 'EXPENSE'>(editingTransaction?.type ?? 'INCOME')
+  const [transactionDate, setTransactionDate] = useState<string>(
+    editingTransaction?.transactionDate ? editingTransaction.transactionDate.slice(0, 10) : new Date().toISOString().slice(0, 10)
+  )
+  const [description, setDescription] = useState<string>(editingTransaction?.description ?? '')
+  const [categoryId, setCategoryId] = useState<string | ''>(editingTransaction?.category?.id ?? '')
+  const [amount, setAmount] = useState<string>(editingTransaction ? String(editingTransaction.amount) : '')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string>('')
+
+  const resetForm = () => {
+    setType('INCOME')
+    setTransactionDate(new Date().toISOString().slice(0, 10))
+    setDescription('')
+    setCategoryId('')
+    setAmount('')
+    setError('')
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError('')
+
+    // Basic validation
+    if (!description.trim()) return setError('Deskripsi wajib diisi')
+    if (!transactionDate) return setError('Tanggal wajib diisi')
+    if (categoryId === '' || categoryId === null) return setError('Kategori wajib dipilih')
+    if (!amount || Number(isNaN(Number(amount)) ? 0 : Number(amount)) === 0) return setError('Jumlah harus lebih dari 0')
+
+    const payload: {
+      type: 'INCOME' | 'EXPENSE';
+      transactionDate: string;
+      description: string;
+      categoryId: string;
+      amount: number;
+      id?: string;
+    } = {
+      type,
+      transactionDate,
+      description,
+      categoryId: String(categoryId),
+      amount: Number(amount)
+    }
+
+    // If editing, include id and use PUT; otherwise POST
+    const method = isEdit ? 'PUT' : 'POST'
+    const url = isEdit ? `/api/transactions/${editingTransaction!.id}` : '/api/transactions'
+
+    // include id in body in case backend expects it
+    if (isEdit) payload.id = editingTransaction!.id
+
+    try {
+      setLoading(true)
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify(payload)
+      })
+
+      const data = await res.json().catch(() => null)
+
+      if (!res.ok) {
+        const msg = data?.error || data?.message || `HTTP ${res.status}`
+        throw new Error(msg)
+      }
+
+      // success
+      if (onSuccess) onSuccess(data)
+      resetForm()
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Terjadi kesalahan saat menyimpan transaksi')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      {error && <div className="text-sm text-red-600">{error}</div>}
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div>
+          <label className="block text-sm font-medium text-gray-700">Tipe</label>
+          <select name="type" value={type} onChange={(e) => setType(e.target.value as 'INCOME' | 'EXPENSE')} className="form-input mt-1 w-full">
+            <option value="INCOME">Pemasukan</option>
+            <option value="EXPENSE">Pengeluaran</option>
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700">Tanggal</label>
+          <input type="date" name="transactionDate" value={transactionDate} onChange={(e) => setTransactionDate(e.target.value)} className="form-input mt-1 w-full" />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700">Kategori</label>
+          <select name="categoryId" value={categoryId} onChange={(e) => setCategoryId(e.target.value)} className="form-input mt-1 w-full">
+            <option value="">-- Pilih Kategori --</option>
+            {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+        </div>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700">Deskripsi</label>
+        <input type="text" name="description" value={description} onChange={(e) => setDescription(e.target.value)} className="form-input mt-1 w-full" />
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700">Jumlah (angka)</label>
+        <input type="number" name="amount" value={amount} onChange={(e) => setAmount(e.target.value)} className="form-input mt-1 w-full" />
+      </div>
+
+      <div className="flex items-center gap-2">
+        <button type="submit" disabled={loading} className="btn btn-primary">
+          {loading ? (isEdit ? 'Menyimpan...' : 'Membuat...') : (isEdit ? 'Simpan Perubahan' : 'Buat Transaksi')}
+        </button>
+        <button type="button" onClick={() => { resetForm(); if (onCancel) onCancel() }} className="btn btn-secondary">
+          Batal
+        </button>
+      </div>
+    </form>
+  )
+}
