@@ -9,6 +9,7 @@ export async function GET(request: NextRequest) {
     const userId = searchParams.get('userId')
     const month = searchParams.get('month')
     const year = searchParams.get('year')
+    const day = searchParams.get('day')
     const search = searchParams.get('search')
     const sortBy = searchParams.get('sortBy') || 'date-desc'
     const page = parseInt(searchParams.get('page') || '1')
@@ -25,6 +26,13 @@ export async function GET(request: NextRequest) {
     }
     if (year) {
       where.year = parseInt(year)
+    }
+    if (day && month && year) {
+      const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day))
+      where.transactionDate = {
+        gte: date,
+        lt: new Date(date.getTime() + 24 * 60 * 60 * 1000)
+      }
     }
 
     if (search) {
@@ -74,25 +82,22 @@ export async function GET(request: NextRequest) {
       prisma.transaction.count({ where }),
       prisma.transaction.groupBy({
         by: ['type'],
-        where: {
-          ...(month && { month: parseInt(month) }),
-          ...(year && { year: parseInt(year) })
-        },
+        where, // Use the same where clause which includes day filter if present
         _sum: {
           amount: true
         }
       })
     ])
 
-    const summaryData = {
-      totalIncome: summary.find(s => s.type === 'INCOME')?._sum.amount || 0,
-      totalExpense: summary.find(s => s.type === 'EXPENSE')?._sum.amount || 0,
+    const summaryData: any = {
+      totalIncome: Number(summary.find(s => s.type === 'INCOME')?._sum.amount || 0),
+      totalExpense: Number(summary.find(s => s.type === 'EXPENSE')?._sum.amount || 0),
     }
-    summaryData.net = Number(summaryData.totalIncome) - Number(summaryData.totalExpense)
+    summaryData.net = summaryData.totalIncome - summaryData.totalExpense
 
     // Convert BigInt to string for JSON serialization
     const serializedTransactions = transactions.map(t => {
-      const serialized = { ...t }
+      const serialized: any = { ...t }
       // Convert all BigInt fields to strings
       Object.keys(serialized).forEach(key => {
         if (typeof serialized[key] === 'bigint') {
@@ -125,7 +130,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('Error fetching transactions:', error)
     return NextResponse.json(
-      { error: 'Failed to fetch transactions', details: error.message },
+      { error: 'Failed to fetch transactions', details: (error as any).message },
       { status: 500 }
     )
   }
@@ -205,7 +210,7 @@ export async function POST(request: NextRequest) {
     })
 
     // Convert BigInt to string for JSON serialization
-    const serializedTransaction = { ...transaction }
+    const serializedTransaction: any = { ...transaction }
     Object.keys(serializedTransaction).forEach(key => {
       if (typeof serializedTransaction[key] === 'bigint') {
         serializedTransaction[key] = serializedTransaction[key].toString()

@@ -10,6 +10,7 @@ export async function GET(request: NextRequest) {
     const userId = searchParams.get('userId')
     const month = searchParams.get('month')
     const year = searchParams.get('year')
+    const day = searchParams.get('day')
     const search = searchParams.get('search')
     const sortBy = searchParams.get('sortBy') || 'date-desc'
     const page = parseInt(searchParams.get('page') || '1')
@@ -21,7 +22,14 @@ export async function GET(request: NextRequest) {
     if (status) where.status = status.toUpperCase()
     if (customerId) where.customerId = parseInt(customerId)
     if (userId) where.userId = parseInt(userId)
-    if (month) {
+    
+    if (day && month && year) {
+      const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day))
+      where.issueDate = {
+        gte: date,
+        lt: new Date(date.getTime() + 24 * 60 * 60 * 1000)
+      }
+    } else if (month) {
       const monthNum = parseInt(month);
       const yearNum = year ? parseInt(year) : new Date().getFullYear();
       const start = new Date(yearNum, monthNum - 1, 1);
@@ -73,7 +81,6 @@ export async function GET(request: NextRequest) {
             select: {
               items: true,
               payments: true,
-              transactions: true
             }
           },
           payments: {
@@ -92,6 +99,19 @@ export async function GET(request: NextRequest) {
       }),
       prisma.invoice.count({ where })
     ])
+
+    let summaryData = null;
+    if (searchParams.get('summary') === 'true') {
+      const [totalCount, paidCount] = await Promise.all([
+        prisma.invoice.count({ where }),
+        prisma.invoice.count({ where: { ...where, status: 'PAID' } })
+      ]);
+      summaryData = {
+        total: totalCount,
+        paid: paidCount,
+        pending: totalCount - paidCount
+      };
+    }
 
     // Convert BigInt to string for JSON serialization
     const serializedInvoices = invoices.map(inv => ({
@@ -130,7 +150,8 @@ export async function GET(request: NextRequest) {
         page,
         limit,
         pages: Math.ceil(total / limit)
-      }
+      },
+      summary: summaryData
     })
   } catch (error: any) {
     console.error('Error fetching invoices:', error)

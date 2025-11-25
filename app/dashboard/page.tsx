@@ -39,20 +39,51 @@ export default function Dashboard() {
   const [recentTransactions, setRecentTransactions] = useState<RecentTransaction[]>([])
   const [recentInvoices, setRecentInvoices] = useState<RecentInvoice[]>([])
   const [loading, setLoading] = useState(true)
+  
+  // Filter states
+  const [showFilterModal, setShowFilterModal] = useState(false)
+  const [filterType, setFilterType] = useState<'all' | 'month' | 'year' | 'day'>('all')
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().slice(0, 10))
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1)
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
+  const [displayPeriod, setDisplayPeriod] = useState('Semua Waktu')
 
   useEffect(() => {
     fetchDashboardData()
   }, [])
 
-  const fetchDashboardData = async () => {
+  const fetchDashboardData = async (
+    type: 'all' | 'month' | 'year' | 'day' = 'all',
+    dateStr = '',
+    month = 0,
+    year = 0
+  ) => {
     try {
-      const currentMonth = new Date().getMonth() + 1
-      const currentYear = new Date().getFullYear()
+      setLoading(true)
+      let queryParams = ''
+      let periodText = 'Semua Waktu'
+
+      if (type === 'day') {
+        const d = new Date(dateStr)
+        const dDay = d.getDate()
+        const dMonth = d.getMonth() + 1
+        const dYear = d.getFullYear()
+        queryParams = `?day=${dDay}&month=${dMonth}&year=${dYear}`
+        periodText = d.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
+      } else if (type === 'month') {
+        queryParams = `?month=${month}&year=${year}`
+        periodText = new Date(year, month - 1).toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })
+      } else if (type === 'year') {
+        queryParams = `?year=${year}`
+        periodText = `Tahun ${year}`
+      }
+
+      setDisplayPeriod(periodText)
 
       const [summaryRes, transactionsRes, invoicesRes] = await Promise.all([
-        fetch(`/api/transactions?month=${currentMonth}&year=${currentYear}`),
-        fetch('/api/transactions?limit=5'),
-        fetch('/api/invoices?limit=5')
+        fetch(`/api/transactions${queryParams}`, { cache: 'no-store' }),
+        fetch('/api/transactions?limit=5', { cache: 'no-store' }),
+        fetch(`/api/invoices${queryParams}${queryParams ? '&' : '?'}limit=5&summary=true`, { cache: 'no-store' })
       ])
 
       const summaryData = await summaryRes.json()
@@ -63,9 +94,9 @@ export default function Dashboard() {
         totalIncome: Number(summaryData.summary?.totalIncome || 0),
         totalExpense: Number(summaryData.summary?.totalExpense || 0),
         netAmount: Number(summaryData.summary?.net || 0),
-        totalInvoices: invoicesData.invoices?.length || 0,
-        paidInvoices: invoicesData.invoices?.filter((inv: any) => inv.status === 'PAID').length || 0,
-        pendingInvoices: invoicesData.invoices?.filter((inv: any) => inv.status !== 'PAID').length || 0,
+        totalInvoices: invoicesData.summary?.total || 0,
+        paidInvoices: invoicesData.summary?.paid || 0,
+        pendingInvoices: invoicesData.summary?.pending || 0,
       })
 
       setRecentTransactions(transactionsData.transactions || [])
@@ -106,12 +137,123 @@ export default function Dashboard() {
           <h1 className="text-xl sm:text-2xl font-bold text-gray-900 mb-1">Dashboard</h1>
           <p className="text-sm text-gray-500">Ringkasan keuangan dan aktivitas terbaru</p>
         </div>
-        <div className="text-left sm:text-right">
-          <p className="text-sm text-gray-500">
-            Periode: {new Date().toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })}
-          </p>
+        <div className="flex items-center gap-3">
+          <div className="text-right">
+            <p className="text-sm text-gray-500">
+              Periode: <span className="font-medium text-gray-900">{displayPeriod}</span>
+            </p>
+          </div>
+          <button
+            onClick={() => setShowFilterModal(true)}
+            className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+            title="Filter Dashboard"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+            </svg>
+          </button>
         </div>
       </div>
+
+      {/* Filter Modal */}
+      {showFilterModal && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="w-full max-w-sm bg-white rounded-lg shadow-xl overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+              <h3 className="text-lg font-medium text-gray-900">Filter Dashboard</h3>
+              <button onClick={() => setShowFilterModal(false)} className="text-gray-400 hover:text-gray-500">
+                <span className="text-2xl">&times;</span>
+              </button>
+            </div>
+            
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Tampilkan Berdasarkan</label>
+                <select
+                  value={filterType}
+                  onChange={(e) => setFilterType(e.target.value as any)}
+                  className="form-input w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                >
+                  <option value="all">Semua Waktu</option>
+                  <option value="day">Harian</option>
+                  <option value="month">Bulanan</option>
+                  <option value="year">Tahunan</option>
+                </select>
+              </div>
+
+              {filterType === 'day' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Pilih Tanggal</label>
+                  <input
+                    type="date"
+                    value={selectedDate}
+                    onChange={(e) => setSelectedDate(e.target.value)}
+                    className="form-input w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  />
+                </div>
+              )}
+
+              {filterType === 'month' && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Bulan</label>
+                    <select
+                      value={selectedMonth}
+                      onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
+                      className="form-input w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                    >
+                      {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
+                        <option key={m} value={m}>
+                          {new Date(2000, m - 1).toLocaleDateString('id-ID', { month: 'long' })}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Tahun</label>
+                    <input
+                      type="number"
+                      value={selectedYear}
+                      onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+                      className="form-input w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {filterType === 'year' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Tahun</label>
+                  <input
+                    type="number"
+                    value={selectedYear}
+                    onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+                    className="form-input w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  />
+                </div>
+              )}
+
+              <div className="pt-4 flex gap-3">
+                <button
+                  onClick={() => setShowFilterModal(false)}
+                  className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors"
+                >
+                  Batal
+                </button>
+                <button
+                  onClick={() => {
+                    fetchDashboardData(filterType, selectedDate, selectedMonth, selectedYear)
+                    setShowFilterModal(false)
+                  }}
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                >
+                  Terapkan
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
