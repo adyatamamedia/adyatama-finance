@@ -132,7 +132,7 @@ export default function TransactionsPage() {
     } finally {
       setLoading(false)
     }
-  }, [limit, sortBy])
+  }, [limit, sortBy, filters])
 
   // Debounce search input
   useEffect(() => {
@@ -150,7 +150,7 @@ export default function TransactionsPage() {
   useEffect(() => {
     // fetch when currentPage, filters, limit, sortBy change
     fetchTransactions(currentPage, filters)
-  }, [currentPage, filters, limit, sortBy])
+  }, [currentPage, filters, limit, sortBy, fetchTransactions])
 
   // fetch categories once
   useEffect(() => {
@@ -700,21 +700,6 @@ export default function TransactionsPage() {
             )}
           </div>
 
-          {/* Action Buttons */}
-          <div className="flex items-center gap-2 lg:ml-auto">
-            <button
-              onClick={() => {
-                setEditingTransaction(null)
-                setShowFormModal(true)
-              }}
-              className="btn btn-primary flex items-center gap-2"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
-              </svg>
-              <span>Tambah</span>
-            </button>
-
             <button
               onClick={() => setShowImportModal(true)}
               className="btn btn-secondary flex items-center gap-2"
@@ -736,7 +721,6 @@ export default function TransactionsPage() {
             </button>
           </div>
         </div>
-      </div>
 
         {/* Filter Panel */}
         {showFilters && (
@@ -1057,53 +1041,26 @@ export default function TransactionsPage() {
           {totalPages > 1 && (
             <div className="bg-white border-t border-gray-200">
               {/* Mobile Pagination */}
-              <div className="lg:hidden px-4 py-3">
-                <div className="flex flex-col gap-3">
-                  {/* Info Text */}
-                  <div className="text-center text-xs text-gray-600">
-                    Menampilkan <span className="font-medium">{(currentPage - 1) * limit + 1}</span>-<span className="font-medium">{Math.min(currentPage * limit, totalTransactions)}</span> dari <span className="font-medium">{totalTransactions}</span> data
-                  </div>
-
-                  {/* Page Navigation */}
-                  <div className="flex items-center justify-between">
-                    <button
-                      onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                      disabled={currentPage === 1}
-                      className={`flex items-center gap-1 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
-                        currentPage === 1
-                          ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                          : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 active:bg-gray-100'
-                      }`}
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
-                      </svg>
-                      <span>Sebelumnya</span>
-                    </button>
-
-                    <div className="flex items-center gap-1">
-                      <span className="px-3 py-1 bg-blue-600 text-white text-sm font-medium rounded-lg min-w-[80px] text-center">
-                        {currentPage}/{totalPages}
-                      </span>
-                    </div>
-
-                    <button
-                      onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                      disabled={currentPage === totalPages}
-                      className={`flex items-center gap-1 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
-                        currentPage === totalPages
-                          ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                          : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 active:bg-gray-100'
-                      }`}
-                    >
-                      <span>Selanjutnya</span>
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
-                      </svg>
-                    </button>
-                  </div>
-                </div>
-              </div>
+              {/* Mobile Pagination Compact */}
+<div className="lg:hidden flex items-center justify-between px-4 py-2 text-sm">
+  <button
+    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+    disabled={currentPage === 1}
+    className="p-1 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+    aria-label="Previous page"
+  >
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7"/></svg>
+  </button>
+  <span className="text-gray-600">Page {currentPage} of {totalPages}</span>
+  <button
+    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+    disabled={currentPage === totalPages}
+    className="p-1 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+    aria-label="Next page"
+  >
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"/></svg>
+  </button>
+</div>
 
               {/* Desktop Pagination */}
               <div className="hidden lg:block px-6 py-4">
