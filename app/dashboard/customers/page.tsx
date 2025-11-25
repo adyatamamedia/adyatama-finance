@@ -63,46 +63,47 @@ export default function CustomersPage() {
   }
 
   return (
-    <div className="px-3 sm:px-4 lg:px-6 py-4 lg:py-6">
-      <div className="mb-6">
-        <h1 className="text-xl sm:text-2xl font-bold text-gray-900 mb-4 sm:mb-6">Pelanggan</h1>
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-          <div className="flex items-center space-x-4">
-            <div className="relative w-full sm:w-64">
-              <input
-                type="text"
-                placeholder="Cari pelanggan..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="form-input pl-10 w-full"
-              />
-              <svg className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-            </div>
-            <div className="text-gray-500 text-sm whitespace-nowrap">
-              {filteredCustomers.length} dari {customers.length} pelanggan
-            </div>
-          </div>
-
-          <button
-            onClick={() => setShowForm(!showForm)}
-            className="btn btn-primary"
-          >
-            {showForm ? 'Tutup Form' : 'Tambah Pelanggan'}
-          </button>
+    <div className="space-y-4 sm:space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Pelanggan</h1>
+          <span className="bg-blue-100 text-blue-800 text-xs sm:text-sm font-semibold px-2.5 py-1 rounded-full">
+            {filteredCustomers.length}
+          </span>
         </div>
+        <button
+          onClick={() => setShowForm(!showForm)}
+          className="btn btn-primary w-full sm:w-auto"
+        >
+          {showForm ? 'Tutup Form' : 'Tambah Pelanggan'}
+        </button>
+      </div>
 
-        {showForm && (
-          <div className="bg-white border border-gray-200 rounded-lg p-6 mb-6">
-            <h3 className="text-lg font-semibold mb-4">Tambah Pelanggan Baru</h3>
-            <CustomerForm onSuccess={() => {
-              setShowForm(false)
+      <div className="relative">
+        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+          <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+        </div>
+        <input
+          type="text"
+          placeholder="Cari pelanggan..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="form-input pl-10 w-full"
+        />
+      </div>
+
+      {showForm && (
+        <div className="bg-white border border-gray-200 rounded-lg p-4 sm:p-6">
+          <h3 className="text-lg font-semibold mb-4">Tambah Pelanggan Baru</h3>
+          <CustomerForm onSuccess={() => {
+            setShowForm(false)
+
               fetchCustomers()
             }} />
           </div>
         )}
-      </div>
 
       <div className="bg-white border border-gray-200 rounded-lg overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200">

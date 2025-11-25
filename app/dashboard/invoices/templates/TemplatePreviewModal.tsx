@@ -23,7 +23,15 @@ interface TemplatePreviewModalProps {
 }
 
 export default function TemplatePreviewModal({ isOpen, onClose, template, sampleInvoice: propSampleInvoice }: TemplatePreviewModalProps) {
-  const [scale, setScale] = useState(0.8)
+  // Set initial scale based on viewport size
+  const getInitialScale = () => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth < 640 ? 0.4 : 0.8  // Smaller scale for mobile
+    }
+    return 0.8
+  }
+  
+  const [scale, setScale] = useState(getInitialScale)
   const componentRef = useRef<HTMLDivElement>(null)
 
   // Use prop data if available, otherwise use default sample data
@@ -1026,43 +1034,67 @@ export default function TemplatePreviewModal({ isOpen, onClose, template, sample
   }
 
   return (
-    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 z-50 flex items-center justify-center p-4">
-      <div className="w-full max-w-6xl bg-white rounded-lg shadow-xl max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-gray-900 bg-opacity-75 z-50 flex items-center justify-center p-0 sm:p-4">
+      <div className="w-full h-full sm:h-auto sm:max-w-6xl bg-white sm:rounded-lg shadow-xl flex flex-col sm:max-h-[90vh]">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-          <h2 className="text-xl font-semibold text-gray-900">
-            Preview Template: {template.name}
+        <div className="px-3 sm:px-6 py-3 sm:py-4 border-b border-gray-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-0 flex-shrink-0">
+          <h2 className="text-base sm:text-xl font-semibold text-gray-900 truncate">
+            Preview: {template.name}
           </h2>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            {/* Zoom Controls - Mobile */}
+            <div className="flex items-center gap-1 sm:hidden flex-1">
+              <button
+                type="button"
+                className="flex-1 inline-flex justify-center items-center rounded-md border border-gray-300 shadow-sm px-2 py-1.5 bg-white text-xs font-medium text-gray-700 hover:bg-gray-50 focus:outline-none"
+                onClick={() => setScale(prev => Math.max(0.3, prev - 0.1))}
+              >
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 12H4" />
+                </svg>
+              </button>
+              <span className="text-xs text-gray-600 whitespace-nowrap">{Math.round(scale * 100)}%</span>
+              <button
+                type="button"
+                className="flex-1 inline-flex justify-center items-center rounded-md border border-gray-300 shadow-sm px-2 py-1.5 bg-white text-xs font-medium text-gray-700 hover:bg-gray-50 focus:outline-none"
+                onClick={() => setScale(prev => Math.min(1.5, prev + 0.1))}
+              >
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Action Buttons */}
             <button
               type="button"
-              className="inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:text-sm"
+              className="inline-flex justify-center items-center rounded-md border border-transparent shadow-sm px-2 sm:px-4 py-1.5 sm:py-2 bg-blue-600 text-xs sm:text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
               onClick={handlePrint}
             >
-              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-3 h-3 sm:w-4 sm:h-4 sm:mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
               </svg>
-              Print
+              <span className="hidden sm:inline">Print</span>
             </button>
             
             <div className="inline-block">
-               <button
+             <button
               type="button"
-              className="inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:text-sm"
+              className="inline-flex justify-center items-center rounded-md border border-transparent shadow-sm px-2 sm:px-4 py-1.5 sm:py-2 bg-red-600 text-xs sm:text-sm font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
               onClick={handleDownloadPDF}
             >
-              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-3 h-3 sm:w-4 sm:h-4 sm:mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
-              Unduh PDF
+              <span className="hidden sm:inline">PDF</span>
             </button>
             </div>
 
             <button
               onClick={onClose}
-              className="btn btn-secondary"
+              className="inline-flex justify-center items-center rounded-md border border-gray-300 shadow-sm px-2 sm:px-4 py-1.5 sm:py-2 bg-white text-xs sm:text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-3 h-3 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
@@ -1070,10 +1102,42 @@ export default function TemplatePreviewModal({ isOpen, onClose, template, sample
         </div>
 
         {/* Preview Content */}
-        <div className="flex-1 overflow-auto bg-gray-100 p-4 sm:p-8">
+        <div className="flex-1 overflow-auto bg-gray-100 p-2 sm:p-4 md:p-8">
           <div ref={componentRef} className="max-w-[210mm] mx-auto bg-white shadow-lg transition-transform origin-top" style={{ transform: `scale(${scale})` }}>
             {renderTemplate()}
           </div>
+        </div>
+
+        {/* Zoom Controls - Desktop */}
+        <div className="hidden sm:flex items-center justify-center gap-3 px-6 py-3 border-t border-gray-200 bg-gray-50 flex-shrink-0">
+          <button
+            type="button"
+            className="inline-flex items-center rounded-md border border-gray-300 shadow-sm px-3 py-1.5 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none"
+            onClick={() => setScale(prev => Math.max(0.3, prev - 0.1))}
+          >
+            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 12H4" />
+            </svg>
+            Zoom Out
+          </button>
+          <span className="text-sm text-gray-600 font-medium min-w-[60px] text-center">{Math.round(scale * 100)}%</span>
+          <button
+            type="button"
+            className="inline-flex items-center rounded-md border border-gray-300 shadow-sm px-3 py-1.5 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none"
+            onClick={() => setScale(prev => Math.min(1.5, prev + 0.1))}
+          >
+            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+            </svg>
+            Zoom In
+          </button>
+          <button
+            type="button"
+            className="inline-flex items-center rounded-md border border-gray-300 shadow-sm px-3 py-1.5 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none"
+            onClick={() => setScale(0.8)}
+          >
+            Reset
+          </button>
         </div>
       </div>
     </div>

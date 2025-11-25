@@ -100,8 +100,8 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="px-3 sm:px-4 lg:px-6 py-4 lg:py-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-gray-900 mb-1">Dashboard</h1>
           <p className="text-sm text-gray-500">Ringkasan keuangan dan aktivitas terbaru</p>
@@ -114,7 +114,7 @@ export default function Dashboard() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="stats-card">
           <div className="flex items-center">
             <div className="flex-1">

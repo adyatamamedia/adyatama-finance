@@ -78,73 +78,74 @@ export default function CategoriesPage() {
   return (
 
 
-    <div className="px-3 sm:px-4 lg:px-6 py-4 lg:py-6">
-        <h1 className="text-xl sm:text-2xl font-bold text-gray-900 mb-4 sm:mb-6">Kategori</h1>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-            <div className="text-green-600 text-sm font-medium">Kategori Pemasukan</div>
-            <div className="text-2xl font-bold text-green-700">{incomeCategories.length}</div>
-          </div>
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-            <div className="text-red-600 text-sm font-medium">Kategori Pengeluaran</div>
-            <div className="text-2xl font-bold text-red-700">{expenseCategories.length}</div>
-          </div>
-        </div>
-
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-          <div className="flex items-center space-x-4">
-            <div className="btn-group">
-              <button
-                onClick={() => setFilter('ALL')}
-                className={`px-4 py-2 text-sm font-medium rounded-l-md ${
-                  filter === 'ALL'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
-                }`}
-              >
-                Semua ({categories.length})
-              </button>
-              <button
-                onClick={() => setFilter('INCOME')}
-                className={`px-4 py-2 text-sm font-medium border-t border-b border-r ${
-                  filter === 'INCOME'
-                    ? 'bg-green-600 text-white'
-                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-                }`}
-              >
-                Pemasukan ({incomeCategories.length})
-              </button>
-              <button
-                onClick={() => setFilter('EXPENSE')}
-                className={`px-4 py-2 text-sm font-medium rounded-r-md border-t border-b border-r ${
-                  filter === 'EXPENSE'
-                    ? 'bg-red-600 text-white'
-                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-                }`}
-              >
-                Pengeluaran ({expenseCategories.length})
-              </button>
-            </div>
-          </div>
-
-          <button
-            onClick={() => setShowForm(!showForm)}
-            className="btn btn-primary"
-          >
-            {showForm ? 'Tutup Form' : 'Tambah Kategori'}
-          </button>
-
-        {showForm && (
-          <div className="bg-white border border-gray-200 rounded-lg p-6 mb-6">
-            <h3 className="text-lg font-semibold mb-4">Tambah Kategori Baru</h3>
-            <CategoryForm onSuccess={() => {
-              setShowForm(false)
-              fetchCategories()
-            }} />
-          </div>
-        )}
+    <div className="space-y-4 sm:space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Kategori</h1>
+        <button
+          onClick={() => setShowForm(!showForm)}
+          className="btn btn-primary w-full sm:w-auto"
+        >
+          {showForm ? 'Tutup Form' : 'Tambah Kategori'}
+        </button>
       </div>
+
+      <div className="grid grid-cols-2 gap-3 sm:gap-4">
+        <div className="bg-green-50 border border-green-200 rounded-lg p-3 sm:p-4">
+          <div className="text-green-600 text-xs sm:text-sm font-medium">Pemasukan</div>
+          <div className="text-xl sm:text-2xl font-bold text-green-700">{incomeCategories.length}</div>
+        </div>
+        <div className="bg-red-50 border border-red-200 rounded-lg p-3 sm:p-4">
+          <div className="text-red-600 text-xs sm:text-sm font-medium">Pengeluaran</div>
+          <div className="text-xl sm:text-2xl font-bold text-red-700">{expenseCategories.length}</div>
+        </div>
+      </div>
+
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="btn-group flex-1">
+          <button
+            onClick={() => setFilter('ALL')}
+            className={`flex-1 px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium rounded-l-md ${
+              filter === 'ALL'
+                ? 'bg-blue-600 text-white'
+                : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+            }`}
+          >
+            Semua ({categories.length})
+          </button>
+          <button
+            onClick={() => setFilter('INCOME')}
+            className={`flex-1 px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium border-t border-b border-r ${
+              filter === 'INCOME'
+                ? 'bg-green-600 text-white'
+                : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+            }`}
+          >
+            <span className="hidden sm:inline">Pemasukan</span>
+            <span className="sm:hidden">In</span> ({incomeCategories.length})
+          </button>
+          <button
+            onClick={() => setFilter('EXPENSE')}
+            className={`flex-1 px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium rounded-r-md border-t border-b border-r ${
+              filter === 'EXPENSE'
+                ? 'bg-red-600 text-white'
+                : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+            }`}
+          >
+            <span className="hidden sm:inline">Pengeluaran</span>
+            <span className="sm:hidden">Out</span> ({expenseCategories.length})
+          </button>
+        </div>
+      </div>
+
+      {showForm && (
+        <div className="bg-white border border-gray-200 rounded-lg p-4 sm:p-6">
+          <h3 className="text-lg font-semibold mb-4">Tambah Kategori Baru</h3>
+          <CategoryForm onSuccess={() => {
+            setShowForm(false)
+            fetchCategories()
+          }} />
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {filter === 'ALL' || filter === 'INCOME' ? (

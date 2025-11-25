@@ -705,7 +705,7 @@ export default function InvoicesPage() {
   const remainingTotal = totalInvoiceValue - paidTotal > 0 ? totalInvoiceValue - paidTotal : 0
 
   return (
-    <div className="px-3 sm:px-4 lg:px-6 py-4 lg:py-6">
+    <div className="space-y-4">
       {success && (
         <div className="mb-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative" role="alert">
           <strong className="font-bold">Sukses! </strong>
@@ -753,8 +753,72 @@ export default function InvoicesPage() {
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 lg:ml-auto">
-          {/* Search Bar - Full width on mobile, takes remaining space on desktop */}
+
+        {/* Mobile Controls */}
+        <div className="lg:hidden space-y-3">
+          {/* Search Bar - Full Width */}
+          <div className="relative">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </div>
+            <input
+              type="text"
+              placeholder="Cari invoice..."
+              className="form-input w-full pl-10 pr-4 py-2.5 text-sm"
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value)
+                setCurrentPage(1)
+              }}
+            />
+          </div>
+
+          {/* 3 Main Action Buttons */}
+          <div className="grid grid-cols-3 gap-2">
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className={`relative flex flex-col items-center justify-center p-2.5 rounded-lg border transition-colors ${
+                hasActiveFilters 
+                  ? 'bg-blue-600 border-blue-600 text-white' 
+                  : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              <svg className="w-5 h-5 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.707A1 1 0 013 7V4z" />
+              </svg>
+              <span className="text-xs font-medium">Filter</span>
+              {hasActiveFilters && (
+                <span className="absolute -top-1 -right-1 w-2 h-2 bg-blue-600 rounded-full"></span>
+              )}
+            </button>
+
+            <a
+              href="/dashboard/invoices/create"
+              className="flex flex-col items-center justify-center p-2.5 rounded-lg border bg-blue-600 border-blue-600 text-white hover:bg-blue-700 transition-colors"
+            >
+              <svg className="w-5 h-5 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+              </svg>
+              <span className="text-xs font-medium">Buat</span>
+            </a>
+
+            <button
+              onClick={() => setShowExportModal(true)}
+              className="flex flex-col items-center justify-center p-2.5 rounded-lg border bg-white border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors"
+            >
+              <svg className="w-5 h-5 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              <span className="text-xs font-medium">Export</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Desktop Controls */}
+        <div className="hidden lg:flex flex-wrap items-center gap-2">
+          {/* Search Bar */}
           <div className="flex-1 lg:max-w-md">
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -784,7 +848,7 @@ export default function InvoicesPage() {
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.707A1 1 0 013 7V4z" />
               </svg>
-              <span className="hidden sm:inline">Filter</span>
+              <span>Filter</span>
               {hasActiveFilters && (
                 <span className="bg-white text-blue-600 text-xs px-2 py-1 rounded-full">Aktif</span>
               )}
@@ -799,13 +863,13 @@ export default function InvoicesPage() {
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
                 </svg>
-                <span className="hidden sm:inline">Reset</span>
+                <span>Reset</span>
               </button>
             )}
           </div>
 
           {/* Action Buttons */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 lg:ml-auto">
             <a
               href="/dashboard/invoices/create"
               className="btn btn-primary flex items-center gap-2 inline-flex"
@@ -813,7 +877,7 @@ export default function InvoicesPage() {
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
               </svg>
-              <span className="hidden sm:inline">Tambah</span>
+              <span>Tambah</span>
             </a>
 
             <button
@@ -823,7 +887,7 @@ export default function InvoicesPage() {
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
-              <span className="hidden sm:inline">Export</span>
+              <span>Export</span>
             </button>
           </div>
         </div>
@@ -927,41 +991,34 @@ export default function InvoicesPage() {
 
       {/* Table Controls */}
       <div className="bg-white border border-gray-200 rounded-lg p-3 sm:p-4 mb-4">
-        {/* Mobile Layout */}
-        <div className="flex flex-col gap-2 sm:hidden">
-          {/* Combined controls in single row */}
-          <div className="flex items-center justify-between gap-2">
-            {/* Show entries - left side */}
-            <div className="flex items-center gap-2 flex-shrink-0">
-              <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Tampilkan</label>
-              <select
-                value={limit}
-                onChange={(e) => handleLimitChange(parseInt(e.target.value))}
-                className="form-input text-sm w-14 border-gray-300 bg-white"
-              >
-                <option value={10}>10</option>
-                <option value={25}>25</option>
-                <option value={50}>50</option>
-                <option value={100}>100</option>
-              </select>
-              <span className="text-xs text-gray-600 whitespace-nowrap">data</span>
-            </div>
+        {/* Mobile Layout - Simple & Compact */}
+        <div className="flex items-center justify-between gap-3 sm:hidden text-xs">
+          {/* Show entries */}
+          <div className="flex items-center gap-1.5">
+            <span className="text-gray-600">Show:</span>
+            <select
+              value={limit}
+              onChange={(e) => handleLimitChange(parseInt(e.target.value))}
+              className="form-input text-xs px-2 py-1 w-16 border-gray-300 bg-white rounded"
+            >
+              <option value={10}>10</option>
+              <option value={25}>25</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+            </select>
+          </div>
 
-            {/* Divider */}
-            <div className="w-px h-6 bg-gray-300 flex-shrink-0"></div>
-
-            {/* Sort controls - right side */}
-            <div className="flex items-center gap-2 flex-shrink-0">
-              <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Urutkan:</label>
-              <select
-                value={sortBy}
-                onChange={(e) => handleSortChange(e.target.value as 'date-desc' | 'date-asc')}
-                className="form-input text-sm border-gray-300 bg-white min-w-[100px]"
-              >
-                <option value="date-desc">Terbaru</option>
-                <option value="date-asc">Terlama</option>
-              </select>
-            </div>
+          {/* Sort controls */}
+          <div className="flex items-center gap-1.5">
+            <span className="text-gray-600">Sort:</span>
+            <select
+              value={sortBy}
+              onChange={(e) => handleSortChange(e.target.value as 'date-desc' | 'date-asc')}
+              className="form-input text-xs px-2 py-1 border-gray-300 bg-white rounded"
+            >
+              <option value="date-desc">Newest</option>
+              <option value="date-asc">Oldest</option>
+            </select>
           </div>
         </div>
 
@@ -1136,122 +1193,125 @@ export default function InvoicesPage() {
                 const rowNumber = (currentPage - 1) * limit + index + 1
                 return (
                   <div key={invoice.id} className="bg-white hover:bg-gray-50 transition-colors">
-                    <div className="px-4 py-3">
-                      {/* Main Content Row */}
+                    <div className="px-3 py-2.5">
+                      {/* Header Row - Invoice Number, Status, and Total */}
                       <div className="flex items-start justify-between mb-2">
-                        {/* Left side: Number, Invoice No, Customer */}
-                        <div className="flex-1 min-w-0 mr-3">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="inline-flex items-center justify-center w-5 h-5 text-xs font-semibold text-white bg-gray-400 rounded-full flex-shrink-0">
+                        {/* Left: Number and Invoice No */}
+                        <div className="flex-1 min-w-0 mr-2">
+                          <div className="flex items-center gap-1.5 mb-1">
+                            <span className="inline-flex items-center justify-center w-5 h-5 text-xs font-semibold text-white bg-gray-500 rounded-full flex-shrink-0">
                               {rowNumber}
                             </span>
-                            <span className={`inline-flex px-1.5 py-0.5 text-xs font-medium rounded ${getStatusColor(invoice.status)}`}>
+                            <span className={`inline-flex px-2 py-0.5 text-xs font-semibold rounded ${getStatusColor(invoice.status)}`}>
                               {getStatusText(invoice.status)}
                             </span>
                           </div>
-                          <div className="text-sm font-medium text-gray-900 truncate pr-2">
+                          <div className="text-sm font-bold text-gray-900 truncate">
                             {invoice.invoiceNo}
-                          </div>
-                          <div className="text-xs text-gray-500 mt-0.5">
-                            {invoice.customer?.name || 'Tanpa pelanggan'}
                           </div>
                         </div>
 
-                        {/* Right side: Total */}
-                        <div className="flex flex-col items-end">
+                        {/* Right: Total */}
+                        <div className="flex flex-col items-end flex-shrink-0">
                           <div className="text-base font-bold text-gray-900">
                             {formatCurrency(totalNum)}
                           </div>
-                          {/* Total Paid */}
-                          {invoice.payments && invoice.payments.length > 0 && (
-                            <div className="text-xs font-medium text-green-600 mt-1">
-                              Dibayar: {formatCurrency(invoice.payments.reduce((sum, p) => sum + (typeof p.amount === 'string' ? parseFloat(p.amount) : p.amount), 0))}
-                            </div>
-                          )}
-                          {/* Remaining */}
-                          {(() => {
-                            const paid = invoice.payments?.reduce((sum, p) => sum + (typeof p.amount === 'string' ? parseFloat(p.amount) : p.amount), 0) || 0
-                            const remaining = totalNum - paid
-                            if (remaining > 0) {
-                              return (
-                                <div className="text-xs font-medium text-red-600 mt-1">
-                                  Sisa: {formatCurrency(remaining)}
-                                </div>
-                              )
-                            }
-                            return null
-                          })()}
-                          {/* Due Date */}
-                          {invoice.dueDate && (
-                            <span className="inline-flex items-center px-1.5 py-0.5 text-xs font-medium text-red-700 bg-red-50 rounded mt-1 max-w-full truncate">
-                              <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                              </svg>
-                              {formatDate(invoice.dueDate)}
-                            </span>
-                          )}
                         </div>
                       </div>
 
-                      {/* Date and Issue Date */}
-                      <div className="mb-2">
-                        <div className="text-xs text-gray-500 flex items-center">
-                          <svg className="w-3 h-3 mr-1 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      {/* Customer Name */}
+                      <div className="text-xs text-gray-600 mb-2 truncate">
+                        <span className="font-medium">👤</span> {invoice.customer?.name || 'Tanpa pelanggan'}
+                      </div>
+
+                      {/* Payment Info */}
+                      <div className="grid grid-cols-2 gap-2 mb-2 text-xs">
+                        {/* Paid Amount */}
+                        {invoice.payments && invoice.payments.length > 0 && (
+                          <div className="flex items-center gap-1">
+                            <span className="text-green-600">✓</span>
+                            <span className="text-gray-600">Dibayar:</span>
+                            <span className="font-semibold text-green-600">
+                              {formatCurrency(invoice.payments.reduce((sum, p) => sum + (typeof p.amount === 'string' ? parseFloat(p.amount) : p.amount), 0))}
+                            </span>
+                          </div>
+                        )}
+                        {/* Remaining Amount */}
+                        {(() => {
+                          const paid = invoice.payments?.reduce((sum, p) => sum + (typeof p.amount === 'string' ? parseFloat(p.amount) : p.amount), 0) || 0
+                          const remaining = totalNum - paid
+                          if (remaining > 0) {
+                            return (
+                              <div className="flex items-center gap-1">
+                                <span className="text-red-600">⚠</span>
+                                <span className="text-gray-600">Sisa:</span>
+                                <span className="font-semibold text-red-600">
+                                  {formatCurrency(remaining)}
+                                </span>
+                              </div>
+                            )
+                          }
+                          return null
+                        })()}
+                      </div>
+
+                      {/* Dates */}
+                      <div className="grid grid-cols-2 gap-2 mb-2 text-xs text-gray-600">
+                        <div className="flex items-center gap-1">
+                          <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                           </svg>
-                          Diterbitkan: {invoice.issueDate ? formatDate(invoice.issueDate) : '-'}
+                          <span className="truncate">{invoice.issueDate ? formatDate(invoice.issueDate) : '-'}</span>
                         </div>
+                        {invoice.dueDate && (
+                          <div className="flex items-center gap-1">
+                            <span className="text-red-600">📅</span>
+                            <span className="truncate">{formatDate(invoice.dueDate)}</span>
+                          </div>
+                        )}
                       </div>
 
                       {/* Action Bar */}
-                      <div className="flex items-center justify-between pt-2 border-t border-gray-100">
-                        <div className="text-xs text-gray-400">
-                          ID: {invoice.id.slice(-8)}
-                        </div>
-                        <div className="flex items-center gap-1">
+                      <div className="flex items-center justify-end gap-1 pt-2 border-t border-gray-100">
+                        <button
+                          onClick={() => window.location.href = `/dashboard/invoices/edit?id=${invoice.id}`}
+                          className="inline-flex items-center justify-center p-1.5 text-xs font-medium text-yellow-700 bg-yellow-50 rounded hover:bg-yellow-100 transition-colors"
+                          title="Edit"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          </svg>
+                        </button>
+                        <button
+                          onClick={() => handlePrint(invoice)}
+                          className="inline-flex items-center justify-center p-1.5 text-xs font-medium text-purple-700 bg-purple-50 rounded hover:bg-purple-100 transition-colors"
+                          title="Preview"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                          </svg>
+                        </button>
+                        <button
+                          onClick={() => handleDelete(invoice)}
+                          className="inline-flex items-center justify-center p-1.5 text-xs font-medium text-red-700 bg-red-50 rounded hover:bg-red-100 transition-colors"
+                          title="Hapus"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                        {invoice.status !== 'PAID' && invoice.status !== 'CANCELLED' && (
                           <button
-                            onClick={() => window.location.href = `/dashboard/invoices/edit?id=${invoice.id}`}
-                            className="inline-flex items-center justify-center p-1.5 text-xs font-medium text-yellow-600 bg-yellow-50 rounded hover:bg-yellow-100 transition-colors"
-                            title="Edit"
+                            onClick={() => handlePayment(invoice)}
+                            className="inline-flex items-center justify-center p-1.5 text-xs font-medium text-green-700 bg-green-50 rounded hover:bg-green-100 transition-colors"
+                            title="Bayar"
                           >
                             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
                             </svg>
-                            <span className="ml-1 hidden sm:inline">Edit</span>
                           </button>
-                          <button
-                            onClick={() => handlePrint(invoice)}
-                            className="inline-flex items-center justify-center p-1.5 text-xs font-medium text-purple-600 bg-purple-50 rounded hover:bg-purple-100 transition-colors"
-                            title="Cetak"
-                          >
-                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-                            </svg>
-                            <span className="ml-1 hidden sm:inline">Cetak</span>
-                          </button>
-                          <button
-                            onClick={() => handlePrint(invoice)}
-                            className="inline-flex items-center justify-center p-1.5 text-xs font-medium text-red-600 bg-red-50 rounded hover:bg-red-100 transition-colors"
-                            title="PDF"
-                          >
-                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                            </svg>
-                            <span className="ml-1 hidden sm:inline">PDF</span>
-                          </button>
-                          {invoice.status !== 'PAID' && invoice.status !== 'CANCELLED' && (
-                            <button
-                              onClick={() => handlePayment(invoice)}
-                              className="inline-flex items-center justify-center p-1.5 text-xs font-medium text-green-600 bg-green-50 rounded hover:bg-green-100 transition-colors"
-                              title="Bayar"
-                            >
-                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
-                              </svg>
-                              <span className="ml-1 hidden sm:inline">Bayar</span>
-                            </button>
-                          )}
-                        </div>
+                        )}
                       </div>
                     </div>
                   </div>

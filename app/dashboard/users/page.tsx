@@ -59,42 +59,41 @@ export default function UsersPage() {
   const activeCount = (users || []).filter(user => user.isActive).length
 
   return (
-    <div className="px-3 sm:px-4 lg:px-6 py-4 lg:py-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">Pengguna</h1>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <div className="text-blue-600 text-sm font-medium">Total Pengguna</div>
-            <div className="text-2xl font-bold text-blue-700">{users.length}</div>
-          </div>
-          <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-            <div className="text-purple-600 text-sm font-medium">Admin</div>
-            <div className="text-2xl font-bold text-purple-700">{adminCount}</div>
-          </div>
-          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-            <div className="text-green-600 text-sm font-medium">Aktif</div>
-            <div className="text-2xl font-bold text-green-700">{activeCount}</div>
-          </div>
-        </div>
-
+    <div className="space-y-4 sm:space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Pengguna</h1>
         <button
           onClick={() => setShowForm(!showForm)}
-          className="btn btn-primary mb-4"
+          className="btn btn-primary w-full sm:w-auto"
         >
           {showForm ? 'Tutup Form' : 'Tambah Pengguna'}
         </button>
-
-        {showForm && (
-          <div className="bg-white border border-gray-200 rounded-lg p-6 mb-6">
-            <h3 className="text-lg font-semibold mb-4">Tambah Pengguna Baru</h3>
-            <UserForm onSuccess={() => {
-              setShowForm(false)
-              fetchUsers()
-            }} />
-          </div>
-        )}
       </div>
+
+      <div className="grid grid-cols-3 gap-3 sm:gap-4">
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 sm:p-4">
+          <div className="text-blue-600 text-xs sm:text-sm font-medium">Total</div>
+          <div className="text-xl sm:text-2xl font-bold text-blue-700">{users.length}</div>
+        </div>
+        <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 sm:p-4">
+          <div className="text-purple-600 text-xs sm:text-sm font-medium">Admin</div>
+          <div className="text-xl sm:text-2xl font-bold text-purple-700">{adminCount}</div>
+        </div>
+        <div className="bg-green-50 border border-green-200 rounded-lg p-3 sm:p-4">
+          <div className="text-green-600 text-xs sm:text-sm font-medium">Aktif</div>
+          <div className="text-xl sm:text-2xl font-bold text-green-700">{activeCount}</div>
+        </div>
+      </div>
+
+      {showForm && (
+        <div className="bg-white border border-gray-200 rounded-lg p-4 sm:p-6">
+          <h3 className="text-lg font-semibold mb-4">Tambah Pengguna Baru</h3>
+          <UserForm onSuccess={() => {
+            setShowForm(false)
+            fetchUsers()
+          }} />
+        </div>
+      )}
 
       <div className="bg-white border border-gray-200 rounded-lg overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200">

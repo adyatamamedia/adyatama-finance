@@ -20,11 +20,11 @@ interface ImportTransaction {
   description: string
   amount: number
   transactionDate: string
-  categoryId?: number | null
+  categoryId?: string | null
 }
 
 interface Category {
-  id: number
+  id: string // changed from number to string to match API response
   name: string
   type: string // 'INCOME'|'EXPENSE' atau lokal 'Pemasukan'/'Pengeluaran'
 }
@@ -40,7 +40,7 @@ type DraftTransaction = {
   amount: number
   transactionDate: string
   rawKategori?: string
-  categoryId?: number | null
+  categoryId?: string | null
 }
 
 export default function ImportTransactions({ onSuccess, categories }: ImportTransactionsProps) {
@@ -63,7 +63,7 @@ export default function ImportTransactions({ onSuccess, categories }: ImportTran
   const [creatingCategories, setCreatingCategories] = useState(false)
 
   // Local lookup map (lowercase name -> id)
-  const categoryNameToId = new Map<string, number>()
+  const categoryNameToId = new Map<string, string>()
   categories.forEach(cat => {
     categoryNameToId.set(cat.name.toString().trim().toLowerCase(), cat.id)
   })
@@ -121,7 +121,7 @@ export default function ImportTransactions({ onSuccess, categories }: ImportTran
     return amountSigned < 0 ? 'EXPENSE' : 'INCOME'
   }
 
-  const findCategoryIdLocal = (categoryName: string | undefined): number | null => {
+  const findCategoryIdLocal = (categoryName: string | undefined): string | null => {
     if (!categoryName) return null
     const key = categoryName.toString().trim().toLowerCase()
     if (categoryNameToId.has(key)) return categoryNameToId.get(key) || null
@@ -155,7 +155,7 @@ export default function ImportTransactions({ onSuccess, categories }: ImportTran
   }
 
   const createMissingCategoriesAPI = async (missing: { name: string; type: string }[]) => {
-    if (!missing || missing.length === 0) return new Map<string, number>()
+    if (!missing || missing.length === 0) return new Map<string, string>()
     // dedupe
     const uniq = new Map<string, { name: string; type: string }>()
     missing.forEach(m => {
@@ -172,7 +172,7 @@ export default function ImportTransactions({ onSuccess, categories }: ImportTran
       return null
     })
     const results = await Promise.all(promises)
-    const map = new Map<string, number>()
+    const map = new Map<string, string>()
     results.forEach(r => { if (r) map.set(r.key, r.id) })
     return map
   }
@@ -248,7 +248,7 @@ export default function ImportTransactions({ onSuccess, categories }: ImportTran
 
       // finalize categoryId using updated local lookup
       const finalTransactions: ImportTransaction[] = drafts.map(d => {
-        let categoryId: number | null = null
+        let categoryId: string | null = null
         if (d.rawKategori) {
           categoryId = findCategoryIdLocal(d.rawKategori)
         }

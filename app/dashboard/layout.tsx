@@ -135,6 +135,16 @@ export default function DashboardLayout({
                   Buat Invoice
                 </Link>
                 <Link
+                  href="/dashboard/invoices/templates"
+                  className={`block px-3 py-2 rounded-lg text-sm transition-colors ${
+                    isActive('/dashboard/invoices/templates') 
+                      ? 'text-indigo-400 font-medium' 
+                      : 'text-gray-400 hover:text-white'
+                  }`}
+                >
+                  Templates
+                </Link>
+                <Link
                   href="/dashboard/customers"
                   className={`block px-3 py-2 rounded-lg text-sm transition-colors ${
                     isActive('/dashboard/customers') 
@@ -228,7 +238,7 @@ export default function DashboardLayout({
         </aside>
 
         {/* Main Content */}
-        <main className="flex-1 overflow-y-auto p-6">
+        <main className="flex-1 overflow-y-auto p-3 sm:p-4 md:p-6">
           {children}
         </main>
       </div>
